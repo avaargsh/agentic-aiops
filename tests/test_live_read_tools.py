@@ -30,7 +30,7 @@ class FakeResponse:
 def incident(scope=None):
     return Incident(
         incident_id="inc-1",
-        title="checkout latency",
+        summary="checkout latency",
         severity="critical",
         scope=scope,
     )
