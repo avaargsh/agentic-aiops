@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Any, Callable
+
+from .durable_runtime import DurableRunContext, DurableRunPort
 
 from .action_orchestrator import ActionOrchestrator, OrchestratedAction, ProposedAction
 from .bundle import EvidenceBundle
@@ -62,3 +64,68 @@ class GoldenIncidentRunner:
         remediation = self.remediation.run(action, approval_granted=approval_granted)
         events.append(self._event("remediation", remediation.status.lower(), evidence_ids=list(remediation.evidence_ids)))
         return GoldenIncidentResult(incident.incident_id, bundle_sha256, action, remediation, tuple(events))
+
+    def run_durable(
+        self,
+        incident: Incident,
+        *,
+        runtime: DurableRunPort,
+        context: DurableRunContext,
+    ) -> GoldenIncidentResult | None:
+        run = runtime.start_or_attach(
+            runtime_run_id=context.runtime_run_id,
+            session_id=context.session_id,
+        )
+
+        investigation = self.investigation.run(incident)
+        bundle = investigation.bundle
+        bundle_sha256 = bundle.sha256()
+        bundle_ref = context.bundle_ref(bundle_sha256)
+        proposal = self.proposal_fn(bundle)
+        action = self.orchestrator.decide(proposal)
+
+        state = runtime.status(run)
+        approval_events = list(state.get("approval_events") or [])
+        approved = any(
+            event.get("approved") is True
+            for event in approval_events
+        )
+        denied = any(
+            event.get("approved") is False
+            for event in approval_events
+        )
+
+        if denied:
+            return None
+
+        if action.approval_required and not approved:
+            runtime.pause(run, evidence_refs=(bundle_ref,))
+            return None
+
+        result = self.remediation.run(
+            action,
+            approval_granted=approved,
+        )
+        runtime.complete(
+            run,
+            result={
+                "incident_id": incident.incident_id,
+                "bundle_sha256": bundle_sha256,
+                "decision": action.selected_path,
+                "remediation_status": result.status,
+            },
+            evidence_refs=(bundle_ref, *result.evidence_ids),
+        )
+
+        return GoldenIncidentResult(
+            incident.incident_id,
+            bundle_sha256,
+            action,
+            result,
+            (
+                self._event("incident", "received"),
+                self._event("investigation", "collected", bundle_sha256=bundle_sha256),
+                self._event("approval", "granted" if approved else "not_required"),
+                self._event("remediation", result.status.lower()),
+            ),
+        )
