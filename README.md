@@ -66,6 +66,23 @@ python examples/live_golden_incident.py continue \
 
 See `docs/golden-incident-v0.1.md` for the recording path and `docs/golden-stack.md` for the three-repository topology.
 
+### What the recording should show
+
+```text
+[ALERT]         checkout-api latency above SLO
+[INVESTIGATE]   Prometheus + Kubernetes read-only evidence
+[EVIDENCE]      evidence://sha256/<bundle>
+[DECISION]      execute / scale deployment/checkout-api
+[GOVERN]        WAIT_APPROVAL (no Kubernetes write)
+[APPROVAL]      approval-001 approved
+[ACTION]        replicas 2 -> 4; rollout ready
+[VERIFY]        post-action latency <= SLO
+[COMPLETE]      Temporal Run terminal; Evidence Refs attached
+[REPLAY]        frozen bundle -> same decision; no live reads
+```
+
+This is the acceptance transcript, not a pre-recorded success claim: a real run must produce the corresponding states before the demo is described as end-to-end verified.
+
 ## Safety and correctness properties
 
 - Evidence is collected before hypotheses and decisions.
@@ -81,8 +98,8 @@ See `docs/golden-incident-v0.1.md` for the recording path and `docs/golden-stack
 
 This repository is the **Evidence Producer + Action Orchestration** layer of the reference stack. It integrates with:
 
-- `agent-decision-lab` — synchronous Decision Plane / `/decision` boundary.
-- `cloud-agent-runtime` — Temporal-backed durable Run lifecycle and approval signals.
+- [`agent-decision-lab`](https://github.com/avaargsh/agent-decision-lab) — synchronous Decision Plane / `/decision` boundary.
+- [`cloud-agent-runtime`](https://github.com/avaargsh/cloud-agent-runtime) — Temporal-backed durable Run lifecycle and approval signals.
 
 Together they implement:
 
