@@ -5,7 +5,9 @@ from .action_orchestrator import (
 )
 from .bundle import EvidenceBundle
 from .decision_client import DecisionClient, HttpDecisionClient
+from .http_client import JsonHttpClient
 from .investigation import Investigation
+from .kubernetes_tool import KubernetesListTool
 from .ledger import DecisionLedgerEntry
 from .models import (
     ChangeEvent,
@@ -17,6 +19,7 @@ from .models import (
     VerificationStatus,
 )
 from .policy import ActionDecision, ActionPolicy
+from .prometheus_tool import PrometheusQuery, PrometheusReadTool
 from .remediation import (
     ExecutionResult,
     RemediationResult,
@@ -44,7 +47,11 @@ __all__ = [
     "Investigation",
     "InvestigationResult",
     "InvestigationRunner",
+    "JsonHttpClient",
+    "KubernetesListTool",
     "OrchestratedAction",
+    "PrometheusQuery",
+    "PrometheusReadTool",
     "ProposedAction",
     "RemediationResult",
     "RollbackResult",
