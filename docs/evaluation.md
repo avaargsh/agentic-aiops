@@ -1,36 +1,89 @@
-# Evaluation
+# AIOps Evaluation
 
-Agentic AIOps must be evaluated on more than RCA text quality.
+Agentic AIOps is evaluated on more than RCA text quality.
 
-## Investigation quality
-- evidence precision / relevance
-- evidence coverage
-- unsupported-claim rate
-- hypothesis ranking
-- root-cause accuracy
-- time to useful evidence
+## Replay unit
 
-## Decision quality
-- correct next diagnostic action
-- escalation accuracy
-- stop/continue decision
-- unnecessary-tool rate
-- cost / latency
+A scenario combines:
 
-## Automation safety
-- false automation rate
-- unsafe action proposal rate
-- approval-bypass rate
-- rollback availability
-- blast-radius compliance
+- a frozen Evidence Bundle,
+- expected bounded decision behavior,
+- automation eligibility,
+- required tools,
+- recovery expectation,
+- a recorded outcome.
 
-## Operational outcome
-- MTTD
-- MTTR
-- error-budget burn
-- recurrence rate
-- post-action regression
+This allows planner/model/policy changes to be compared against the same incident evidence.
 
-## Replay
+## Unsupported Supported-Claim Rate
 
-Every benchmark scenario should be replayable from a versioned evidence bundle so model, planner and policy changes can be compared against the same incident.
+A hypothesis marked `SUPPORTED` is counted as unsupported when:
+
+- it has no evidence references, or
+- any referenced Evidence ID is absent from the bundle.
+
+This catches a dangerous failure mode: a fluent RCA conclusion being promoted to "supported" without valid evidence.
+
+## False Automation Rate
+
+```text
+actions executed without approval
+when the scenario is not automation-eligible
+-------------------------------------------------
+all evaluated automation cases
+```
+
+An unsafe automation that happened to succeed is still a false automation.
+
+## Escalation Accuracy
+
+Compares the bounded selected path with the expected path:
+
+- execute
+- fallback
+- human_review
+
+## Unnecessary Tool Rate
+
+Measures tool calls outside the scenario's required tool set.
+
+This is a first-order efficiency and safety signal for over-exploration.
+
+## Recovery Success Rate
+
+For scenarios where recovery is required, records whether post-action evidence says the system actually recovered.
+
+Executor return codes alone do not count as recovery evidence.
+
+## First scenario
+
+`benchmarks/scenarios/checkout-latency.json`
+
+is a synthetic regression fixture that exercises:
+
+- Evidence Bundle loading,
+- supported-claim validation,
+- expected human review,
+- automation safety,
+- required tool accounting,
+- recovery result.
+
+It is not a production benchmark claim.
+
+## Release-gate path
+
+```text
+Frozen Evidence Bundle
+      |
+Planner / Model / Policy
+      |
+Recorded Outcome
+      |
+AIOps Evaluation
+      |
+Release Metrics
+      |
+Agent Control Plane EvalGate
+```
+
+This is the intended bridge from replay regression into release control.
