@@ -3,7 +3,6 @@ from agentic_aiops.live_remediation import KubectlScaleExecutor, PrometheusPostA
 
 class FakeKubectl(KubectlScaleExecutor):
     def __init__(self):
-        super().__init__(settle_seconds=0) if False else None
         self.namespace = "golden-demo"; self.before_replicas = 2; self.after_replicas = 4; self.kubectl = "kubectl"; self.calls = []
     def _run(self, *args):
         self.calls.append(args)
