@@ -7,6 +7,9 @@ name = "agentic-aiops"
 version = "0.1.0"
 description = "Evidence-first Agentic AIOps reference implementation."
 readme = "README.md"
+license = "Apache-2.0"
+authors = [{ name = "Ben Lee" }]
+keywords = ["aiops", "sre", "kubernetes", "temporal", "incident-response", "agent-infrastructure"]
 requires-python = ">=3.11"
 dependencies = []
 
