@@ -13,6 +13,9 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
+[project.scripts]
+agentic-aiops = "agentic_aiops.cli:main"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
