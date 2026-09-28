@@ -16,6 +16,7 @@ temporal = ["cloud-agent-runtime[temporal]>=0.1.0"]
 
 [project.scripts]
 agentic-aiops = "agentic_aiops.cli:main"
+golden-approval = "agentic_aiops.approval_cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
