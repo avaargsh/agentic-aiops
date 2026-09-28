@@ -1,8 +1,26 @@
 services:
-  temporal:
-    image: temporalio/auto-setup:1.27.2
+  postgresql:
+    image: postgres:16-alpine
     environment:
-      - DB=sqlite
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  temporal:
+    image: temporalio/auto-setup:${TEMPORAL_VERSION:-1.27.2}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgresql
     ports:
       - "7233:7233"
 
