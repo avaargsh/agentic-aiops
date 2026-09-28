@@ -22,16 +22,20 @@
 
 ## v0.3 — Durable workflow
 - [ ] Temporal investigation workflow
-- [ ] approval waits
+- [x] approval sink contract
+- [x] Cloud Agent Runtime approval bridge
+- [x] evidence-backed approval refs
 - [ ] bounded retries
 - [ ] post-action verification
 - [ ] rollback semantics
-- [ ] Cloud Agent Runtime integration
 
-## v0.4 — Evaluation
+## v0.4 — Evaluation and Decision Plane
+- [x] Decision Gateway HTTP client
+- [x] bounded escalation path
+- [x] learned decision + deterministic policy separation
+- [x] Golden Action Gate example
 - [ ] incident scenario corpus
 - [ ] unsupported-claim metric
 - [ ] false automation metric
 - [ ] evidence precision / coverage
 - [ ] MTTD / MTTR simulation
-- [ ] Decision Plane integration
