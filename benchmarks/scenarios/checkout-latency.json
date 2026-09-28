@@ -1,0 +1,72 @@
+{
+  "case_id": "checkout-latency-001",
+  "bundle": {
+    "incident": {
+      "incident_id": "inc-checkout-001",
+      "summary": "checkout p99 latency above SLO",
+      "severity": "sev2",
+      "scope": "cluster=prod-a,namespace=checkout,service=checkout"
+    },
+    "evidence": [
+      {
+        "evidence_id": "e-metrics-1",
+        "source": "prometheus",
+        "observation": "database pool utilization reached 98%",
+        "timestamp": null,
+        "attributes": {},
+        "entity_refs": ["svc-checkout", "db-orders"]
+      },
+      {
+        "evidence_id": "e-k8s-1",
+        "source": "kubernetes",
+        "observation": "checkout pods healthy with no restart spike",
+        "timestamp": null,
+        "attributes": {},
+        "entity_refs": ["svc-checkout"]
+      }
+    ],
+    "hypotheses": [
+      {
+        "hypothesis_id": "h-db-pool",
+        "statement": "database connection pool saturation contributes to latency",
+        "evidence_ids": ["e-metrics-1"],
+        "status": "supported"
+      }
+    ],
+    "entities": [
+      {
+        "entity_id": "svc-checkout",
+        "kind": "service",
+        "name": "checkout",
+        "attributes": {}
+      },
+      {
+        "entity_id": "db-orders",
+        "kind": "database",
+        "name": "orders",
+        "attributes": {}
+      }
+    ],
+    "edges": [
+      {
+        "source": "svc-checkout",
+        "target": "db-orders",
+        "relation": "depends_on"
+      }
+    ],
+    "changes": [],
+    "metadata": {
+      "source": "synthetic-regression"
+    }
+  },
+  "outcome": {
+    "automation_eligible": false,
+    "executed_without_approval": false,
+    "expected_path": "human_review",
+    "selected_path": "human_review",
+    "recovery_required": true,
+    "recovered": true,
+    "tool_calls": ["metrics", "kubernetes"],
+    "required_tools": ["metrics", "kubernetes"]
+  }
+}
