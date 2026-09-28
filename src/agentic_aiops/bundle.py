@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -81,6 +82,18 @@ class EvidenceBundle:
             ],
             metadata=dict(data.get("metadata", {})),
         )
+
+    def canonical_json(self) -> str:
+        payload = self.to_dict()
+        payload["metadata"] = {
+            key: value
+            for key, value in payload.get("metadata", {}).items()
+            if key != "bundle_sha256"
+        }
+        return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+    def sha256(self) -> str:
+        return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
     def write_json(self, path: str | Path) -> None:
         Path(path).write_text(
