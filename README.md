@@ -110,3 +110,21 @@ Observe → Evidence → Decide → Govern → Act → Verify → Replay
 ## Scope after v0.1
 
 The reference slice intentionally stays narrow: Kubernetes workload degradation and bounded scale remediation. Future experiments can cover GPU/NCCL/RDMA incidents, error-budget burn and change regression without changing the control-plane boundaries demonstrated here.
+
+
+## Development
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+pytest -q
+```
+
+For cross-repository integration, the public `avaargsh/temp-runner` repository validates this project together with Agent Decision Lab and Cloud Agent Runtime on a disposable kind cluster.
+
+## Contributing and license
+
+Contributions are welcome through focused issues and pull requests. See `CONTRIBUTING.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md`.
+
+Licensed under Apache License 2.0. See `LICENSE`.
