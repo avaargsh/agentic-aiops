@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
+import json
 from typing import Any, Callable
 
 from .durable_runtime import DurableRunContext, DurableRunPort
@@ -9,6 +11,8 @@ from .durable_runtime import DurableRunContext, DurableRunPort
 from .action_orchestrator import ActionOrchestrator, OrchestratedAction, ProposedAction
 from .bundle import EvidenceBundle
 from .models import Incident
+from .policy import ActionDecision
+from .ledger import DecisionLedgerEntry
 from .remediation import RemediationResult, SafeRemediationRunner
 from .runner import InvestigationRunner
 
@@ -65,6 +69,53 @@ class GoldenIncidentRunner:
         events.append(self._event("remediation", remediation.status.lower(), evidence_ids=list(remediation.evidence_ids)))
         return GoldenIncidentResult(incident.incident_id, bundle_sha256, action, remediation, tuple(events))
 
+    def _freeze(self, context: DurableRunContext, bundle: EvidenceBundle, action: OrchestratedAction) -> None:
+        run_dir = context.run_dir
+        run_dir.mkdir(parents=True, exist_ok=True)
+        bundle.write_json(run_dir / "evidence-bundle.json")
+        (run_dir / "decision.json").write_text(
+            json.dumps(asdict(action), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def _load_frozen(self, context: DurableRunContext) -> tuple[EvidenceBundle, OrchestratedAction] | None:
+        bundle_path = context.run_dir / "evidence-bundle.json"
+        decision_path = context.run_dir / "decision.json"
+        if not bundle_path.exists() or not decision_path.exists():
+            return None
+        bundle = EvidenceBundle.read_json(bundle_path)
+        data = json.loads(decision_path.read_text(encoding="utf-8"))
+        proposal_data = data["proposal"]
+        proposal = ProposedAction(
+            action_kind=proposal_data["action_kind"],
+            target=proposal_data["target"],
+            blast_radius=proposal_data["blast_radius"],
+            rollback_available=proposal_data["rollback_available"],
+            evidence_ids=tuple(proposal_data.get("evidence_ids", ())),
+            description=proposal_data.get("description"),
+        )
+        policy = ActionDecision(**data["policy"])
+        ledger_data = data["ledger"]
+        ledger = DecisionLedgerEntry(
+            decision_type=ledger_data["decision_type"],
+            selected_action=ledger_data["selected_action"],
+            policy_reason=ledger_data["policy_reason"],
+            evidence_ids=tuple(ledger_data.get("evidence_ids", ())),
+            confidence=ledger_data.get("confidence"),
+            requires_approval=ledger_data.get("requires_approval", False),
+            outcome=ledger_data.get("outcome"),
+            attributes=dict(ledger_data.get("attributes", {})),
+        )
+        return bundle, OrchestratedAction(
+            proposal=proposal,
+            selected_path=data["selected_path"],
+            model_confidence=data.get("model_confidence"),
+            policy=policy,
+            execution_allowed=data["execution_allowed"],
+            approval_required=data["approval_required"],
+            ledger=ledger,
+        )
+
     def run_durable(
         self,
         incident: Incident,
@@ -77,13 +128,20 @@ class GoldenIncidentRunner:
             session_id=context.session_id,
         )
 
-        investigation = self.investigation.run(incident)
-        bundle = investigation.bundle
-        bundle_sha256 = bundle.sha256()
-        bundle_ref = context.bundle_ref(bundle_sha256)
-        proposal = self.proposal_fn(bundle)
-        action = self.orchestrator.decide(proposal)
+        frozen = self._load_frozen(context)
+        if frozen is None:
+            investigation = self.investigation.run(incident)
+            bundle = investigation.bundle
+            bundle_sha256 = bundle.sha256()
+            bundle.metadata.update({"schema_version": "aiops.evidence/v1", "bundle_sha256": bundle_sha256})
+            proposal = self.proposal_fn(bundle)
+            action = self.orchestrator.decide(proposal)
+            self._freeze(context, bundle, action)
+        else:
+            bundle, action = frozen
+            bundle_sha256 = bundle.sha256()
 
+        bundle_ref = context.bundle_ref(bundle_sha256)
         state = runtime.status(run)
         approval_events = list(state.get("approval_events") or [])
         approved = any(
