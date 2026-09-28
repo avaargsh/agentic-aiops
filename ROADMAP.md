@@ -20,14 +20,16 @@
 - [ ] live Prometheus adapter
 - [ ] live Kubernetes adapter
 
-## v0.3 — Durable workflow
+## v0.3 — Durable workflow and remediation
 - [ ] Temporal investigation workflow
 - [x] approval sink contract
 - [x] Cloud Agent Runtime approval bridge
 - [x] evidence-backed approval refs
 - [ ] bounded retries
-- [ ] post-action verification
-- [ ] rollback semantics
+- [x] approval-gated write execution
+- [x] post-action verification
+- [x] rollback on failed verification
+- [x] end-to-end remediation evidence chain
 
 ## v0.4 — Evaluation and Decision Plane
 - [x] Decision Gateway HTTP client
