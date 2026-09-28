@@ -42,3 +42,11 @@ def test_golden_incident_executes_only_after_approval():
     assert result.remediation.status == "VERIFIED"
     assert result.bundle_sha256
     assert "e-after" in result.remediation.evidence_ids
+
+
+def test_golden_incident_bundle_hash_is_repeatable_for_same_frozen_bundle():
+    incident = Incident("inc-001", "checkout latency", "sev2")
+    first = build_runner().run(incident)
+    second = build_runner().run(incident)
+    # StaticReadTool generates stable evidence IDs for the same fixture.
+    assert first.bundle_sha256 == second.bundle_sha256
