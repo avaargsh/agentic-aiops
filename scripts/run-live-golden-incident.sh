@@ -14,7 +14,11 @@ kubectl -n "$NS" scale deploy/load-generator --replicas=1
 sleep 8
 
 echo "Starting durable incident run: $RUN_ID"
-echo "The process now waits at Temporal approval; Kubernetes write cannot happen before approval_resolved."
-python examples/live_golden_incident.py --run-id "$RUN_ID" --prometheus "http://127.0.0.1:$PROM_PORT" --kube-api "http://127.0.0.1:$API_PORT"
+python examples/live_golden_incident.py start --run-id "$RUN_ID" --prometheus "http://127.0.0.1:$PROM_PORT" --kube-api "http://127.0.0.1:$API_PORT"
 
+echo
+echo "Run is now durable in Temporal. This shell exits the control path instead of polling."
+echo "Send approval_resolved through cloud-agent-runtime, then run:"
+echo "  python examples/live_golden_incident.py continue --run-id $RUN_ID --prometheus http://127.0.0.1:$PROM_PORT --kube-api http://127.0.0.1:$API_PORT"
+echo
 kubectl -n "$NS" get deploy checkout-api
