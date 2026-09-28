@@ -17,6 +17,13 @@ from .models import (
     VerificationStatus,
 )
 from .policy import ActionDecision, ActionPolicy
+from .remediation import (
+    ExecutionResult,
+    RemediationResult,
+    RollbackResult,
+    SafeRemediationRunner,
+    VerificationResult,
+)
 from .report import render_rca_markdown
 from .runner import InvestigationResult, InvestigationRunner
 from .runtime_bridge import RuntimeApprovalSink
@@ -30,6 +37,7 @@ __all__ = [
     "DecisionLedgerEntry",
     "Evidence",
     "EvidenceBundle",
+    "ExecutionResult",
     "HttpDecisionClient",
     "Hypothesis",
     "Incident",
@@ -38,9 +46,13 @@ __all__ = [
     "InvestigationRunner",
     "OrchestratedAction",
     "ProposedAction",
+    "RemediationResult",
+    "RollbackResult",
     "RuntimeApprovalSink",
+    "SafeRemediationRunner",
     "TopologyEdge",
     "TopologyEntity",
+    "VerificationResult",
     "VerificationStatus",
     "render_rca_markdown",
 ]
