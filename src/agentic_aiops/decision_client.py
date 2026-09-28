@@ -37,8 +37,12 @@ class HttpDecisionClient:
             }
         ).encode("utf-8")
 
+        decision_url = self.endpoint.rstrip("/")
+        if not decision_url.endswith("/decision"):
+            decision_url += "/decision"
+
         req = request.Request(
-            self.endpoint.rstrip("/") + "/decision",
+            decision_url,
             data=body,
             headers={"content-type": "application/json"},
             method="POST",

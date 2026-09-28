@@ -1,0 +1,55 @@
+services:
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  temporal:
+    image: temporalio/auto-setup:${TEMPORAL_VERSION:-1.27.2}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgresql
+    ports:
+      - "7233:7233"
+
+  decision-gateway:
+    build:
+      context: ../agent-decision-lab
+    command: ["decision-lab-server", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      - DECISION_MODE=${DECISION_MODE:-demo}
+    ports:
+      - "8080:8080"
+
+  runtime-worker:
+    build:
+      context: ../cloud-agent-runtime
+    command: ["cloud-agent-runtime-worker", "--target", "temporal:7233", "--task-queue", "agent-runs"]
+    depends_on:
+      - temporal
+
+  golden-demo:
+    build:
+      context: .
+    environment:
+      - DECISION_GATEWAY_URL=http://decision-gateway:8080
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_TASK_QUEUE=agent-runs
+    depends_on:
+      - temporal
+      - decision-gateway
+      - runtime-worker
+    profiles: ["demo"]
+    command: ["python", "examples/golden_incident_checkout.py"]
