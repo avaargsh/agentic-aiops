@@ -6,6 +6,7 @@ def test_disposable_k8s_stack_contains_real_incident_components():
     assert "name: checkout-api" in manifest
     assert "replicas: 2" in manifest
     assert "checkout_request_latency_seconds" in manifest
+    assert "text/plain; version=0.0.4; charset=utf-8" in manifest
     assert "name: prometheus" in manifest
     assert "job_name: checkout-api" in manifest
     assert "name: load-generator" in manifest
