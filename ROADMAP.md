@@ -37,8 +37,12 @@
 - [x] bounded escalation path
 - [x] learned decision + deterministic policy separation
 - [x] Golden Action Gate example
-- [ ] incident scenario corpus
-- [ ] unsupported-claim metric
-- [ ] false automation metric
+- [x] replayable scenario contract
+- [x] first synthetic incident regression scenario
+- [x] unsupported supported-claim metric
+- [x] false automation metric
+- [x] escalation accuracy
+- [x] unnecessary tool rate
+- [x] recovery success rate
 - [ ] evidence precision / coverage
 - [ ] MTTD / MTTR simulation
