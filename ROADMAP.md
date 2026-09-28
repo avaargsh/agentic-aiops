@@ -17,8 +17,9 @@
 - [x] explicit hypothesis verification state
 - [x] RCA markdown report
 - [x] replay into Investigation
-- [ ] live Prometheus adapter
-- [ ] live Kubernetes adapter
+- [x] live Prometheus read-only adapter
+- [x] live Kubernetes read-only adapter
+- [x] bearer-token / CA-aware JSON HTTP client
 
 ## v0.3 — Durable workflow and remediation
 - [ ] Temporal investigation workflow
