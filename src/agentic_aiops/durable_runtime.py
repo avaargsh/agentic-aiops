@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol, Sequence
 
 class DurableRunPort(Protocol):
@@ -14,6 +15,11 @@ class DurableRunContext:
     runtime_run_id: str
     session_id: str
     evidence_uri_prefix: str = "evidence://sha256"
+    artifact_root: str | Path = ".golden-runs"
 
     def bundle_ref(self, bundle_sha256: str) -> str:
         return f"{self.evidence_uri_prefix}/{bundle_sha256}"
+
+    @property
+    def run_dir(self) -> Path:
+        return Path(self.artifact_root) / self.runtime_run_id
