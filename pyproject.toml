@@ -12,6 +12,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+temporal = ["cloud-agent-runtime[temporal]>=0.1.0"]
 
 [project.scripts]
 agentic-aiops = "agentic_aiops.cli:main"
