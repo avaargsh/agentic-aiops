@@ -135,6 +135,9 @@ class GoldenIncidentRunner:
             investigation = self.investigation.run(incident)
             bundle = investigation.bundle
             bundle.metadata["schema_version"] = "aiops.evidence/v1"
+            if context.release_ref:
+                bundle.metadata["release_ref"] = context.release_ref
+                bundle.metadata["runtime_run_id"] = context.runtime_run_id
             bundle_sha256 = bundle.sha256()
             bundle.metadata["bundle_sha256"] = bundle_sha256
             proposal = self.proposal_fn(bundle)
@@ -174,6 +177,8 @@ class GoldenIncidentRunner:
                 "bundle_sha256": bundle_sha256,
                 "decision": action.selected_path,
                 "remediation_status": result.status,
+                "release_ref": context.release_ref,
+                "runtime_run_id": context.runtime_run_id,
             },
             evidence_refs=(bundle_ref, *result.evidence_ids),
         )
