@@ -73,7 +73,7 @@ python examples/live_golden_incident.py continue \
   --run-id golden-checkout-live-001
 ```
 
-See `docs/golden-incident-v0.1.md` for the recording path and `docs/golden-stack.md` for the three-repository topology.
+See `docs/golden-incident-v0.1.md` for the recording path and `docs/golden-stack.md` for the four-repository topology.
 
 ### What the recording should show
 
@@ -109,12 +109,15 @@ This repository is the **Evidence Producer + Action Orchestration** layer of the
 
 - [`agent-decision-lab`](https://github.com/avaargsh/agent-decision-lab) — synchronous Decision Plane / `/decision` boundary.
 - [`cloud-agent-runtime`](https://github.com/avaargsh/cloud-agent-runtime) — Temporal-backed durable Run lifecycle and approval signals.
+- [`agent-control-plane`](https://github.com/avaargsh/agent-control-plane) — AgentRelease resolution, evidence validation and release promotion gate.
 
 Together they implement:
 
 ```text
-Observe → Evidence → Decide → Govern → Act → Verify → Replay
+Observe → Evidence → Decide → Govern → Durable Run → Act → Verify → Release Gate → Replay
 ```
+
+The four-repository implementation is present. M1 is considered complete only after a fresh live acceptance run produces the captured `PROMOTE` proof and the mutated-evidence negative path produces `BLOCK`; unit tests alone do not satisfy that milestone.
 
 ## Scope after v0.1
 

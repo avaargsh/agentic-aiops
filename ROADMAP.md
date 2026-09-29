@@ -22,11 +22,11 @@
 - [x] bearer-token / CA-aware JSON HTTP client
 
 ## v0.3 — Durable workflow and remediation
-- [ ] Temporal investigation workflow
+- [x] Temporal investigation workflow
 - [x] approval sink contract
 - [x] Cloud Agent Runtime approval bridge
 - [x] evidence-backed approval refs
-- [ ] bounded retries
+- [x] bounded retries / desired-state reconciliation for the Golden Kubernetes action
 - [x] approval-gated write execution
 - [x] post-action verification
 - [x] rollback on failed verification
