@@ -17,19 +17,16 @@ class DurableRuntime:
     def __init__(self):
         self.result = None
         self.evidence_refs = ()
+        self.approval_events = []
 
     def start_or_attach(self, *, runtime_run_id, session_id):
         return Run()
 
     def status(self, run):
-        return {
-            "approval_events": [
-                {"approval_id": "approval-001", "approved": True}
-            ]
-        }
+        return {"approval_events": list(self.approval_events)}
 
     def pause(self, run, *, evidence_refs):
-        raise AssertionError("approved fixture must not pause")
+        self.evidence_refs = tuple(evidence_refs)
 
     def complete(self, run, *, result, evidence_refs):
         self.result = result
@@ -46,8 +43,21 @@ def test_release_identity_is_frozen_and_completed_with_run(tmp_path):
         artifact_root=tmp_path,
     )
 
+    incident = Incident("inc-001", "checkout latency", "sev2")
+    assert runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=context,
+    ) is None
+    decision = json.loads(
+        (tmp_path / "run-001" / "decision.json").read_text()
+    )
+    runtime.approval_events = [{
+        "approval_id": decision["ledger"]["attributes"]["approval_id"],
+        "approved": True,
+    }]
     result = runner.run_durable(
-        Incident("inc-001", "checkout latency", "sev2"),
+        incident,
         runtime=runtime,
         context=context,
     )
