@@ -15,6 +15,7 @@ from .policy import ActionDecision
 from .ledger import DecisionLedgerEntry
 from .remediation import RemediationResult, SafeRemediationRunner
 from .runner import InvestigationRunner
+from .release_acceptance import write_control_plane_acceptance
 
 @dataclass(frozen=True)
 class GoldenIncidentEvent:
@@ -225,6 +226,16 @@ class GoldenIncidentRunner:
         post_action_ref = (
             f"artifact://{context.runtime_run_id}/post-action-evidence.json"
         )
+
+        if context.release_ref:
+            write_control_plane_acceptance(
+                run_dir,
+                release_ref=context.release_ref,
+                runtime_run_id=context.runtime_run_id,
+                bundle_sha256=bundle_sha256,
+                remediation_status=result.status,
+                post_action_ref=post_action_ref,
+            )
 
         runtime.complete(
             run,
