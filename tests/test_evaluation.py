@@ -91,3 +91,34 @@ def test_no_supported_claims_is_zero_rate() -> None:
     assert result.unsupported_claim_rate == 0.0
     assert result.false_automation_rate == 0.0
     assert result.recovery_success_rate is None
+
+
+
+def test_aiops_evaluation_exports_control_plane_gate_metrics() -> None:
+    result = evaluate_aiops(
+        [bundle_with_claims()],
+        [
+            AutomationOutcome(
+                case_id="recovery",
+                automation_eligible=False,
+                executed_without_approval=False,
+                expected_path="human_review",
+                selected_path="human_review",
+                recovery_required=True,
+                recovered=True,
+            )
+        ],
+    )
+
+    assert result.gate_metrics() == {
+        "unsupported_claim_rate": pytest.approx(0.5),
+        "false_automation_rate": pytest.approx(0.0),
+        "escalation_accuracy": pytest.approx(1.0),
+        "unnecessary_tool_rate": pytest.approx(0.0),
+        "recovery_success_rate": pytest.approx(1.0),
+    }
+
+
+def test_gate_metrics_omit_unknown_recovery_rate() -> None:
+    result = evaluate_aiops([], [])
+    assert "recovery_success_rate" not in result.gate_metrics()
