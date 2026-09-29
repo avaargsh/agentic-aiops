@@ -1,0 +1,60 @@
+name: live-kind-golden
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "demo/k8s/**"
+      - "scripts/setup-golden-kind.sh"
+      - "scripts/golden-incident.sh"
+
+jobs:
+  kind-live-read-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: golden-aiops
+      - name: Deploy Golden workload
+        run: |
+          kubectl apply -f demo/k8s/golden-stack.yaml
+          kubectl -n golden-demo rollout status deploy/checkout-api --timeout=180s
+          kubectl -n golden-demo rollout status deploy/prometheus --timeout=180s
+      - name: Inject load
+        run: |
+          kubectl -n golden-demo scale deploy/load-generator --replicas=1
+          kubectl -n golden-demo rollout status deploy/load-generator --timeout=120s
+          sleep 10
+      - name: Prove real Kubernetes state
+        run: |
+          kubectl -n golden-demo get deploy checkout-api -o json > /tmp/checkout-deployment.json
+          kubectl -n golden-demo get pods -o wide
+          test "$(kubectl -n golden-demo get deploy checkout-api -o jsonpath='{.spec.replicas}')" = "2"
+      - name: Prove real Prometheus evidence
+        run: |
+          kubectl -n golden-demo port-forward svc/prometheus 19090:9090 >/tmp/prometheus-pf.log 2>&1 &
+          PF=$!
+          trap 'kill $PF || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS 'http://127.0.0.1:19090/api/v1/query?query=max(checkout_request_latency_seconds)' > /tmp/prometheus.json; then break; fi
+            sleep 1
+          done
+          python - <<'PY'
+          import json
+          data=json.load(open("/tmp/prometheus.json"))
+          assert data["status"] == "success"
+          result=data["data"]["result"]
+          assert result, "Prometheus returned no live checkout series"
+          print("live_prometheus_result=", result)
+          PY
+      - name: Upload live proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-kind-golden-proof
+          path: |
+            /tmp/checkout-deployment.json
+            /tmp/prometheus.json
+            /tmp/prometheus-pf.log
