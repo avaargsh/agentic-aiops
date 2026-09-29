@@ -17,6 +17,7 @@ from .remediation import RemediationResult, SafeRemediationRunner
 from .runner import InvestigationRunner
 from .release_acceptance import write_control_plane_acceptance
 from .action_receipt import action_key, load_receipt, store_receipt
+from .operation import OperationRecord, load_operation, store_operation, transition_operation
 
 @dataclass(frozen=True)
 class GoldenIncidentEvent:
@@ -263,12 +264,65 @@ class GoldenIncidentRunner:
             action=action,
         )
         result = load_receipt(context.run_dir, key)
-        if result is None:
-            result = self.remediation.run(
-                action,
-                approval_granted=approved,
+        operation = load_operation(context.run_dir, key)
+        if operation is None:
+            operation = OperationRecord(
+                operation_id=key,
+                phase="PREPARED",
+                runtime_run_id=context.runtime_run_id,
+                decision_id=action.decision_id or "",
+                action_kind=action.proposal.action_kind,
+                target=action.proposal.target,
+                evidence_digest=str(action.ledger.attributes.get("evidence_digest", "")),
+                desired_state={"replicas": 4} if action.proposal.action_kind == "scale" else {},
             )
-            store_receipt(context.run_dir, key, result)
+            store_operation(context.run_dir, operation)
+        if result is None:
+            try:
+                result = self.remediation.run(
+                    action,
+                    approval_granted=approved,
+                )
+                operation = transition_operation(
+                    context.run_dir,
+                    operation,
+                    "APPLIED",
+                    evidence_refs=tuple(
+                        result.execution.evidence_ids
+                        if result.execution is not None else ()
+                    ),
+                )
+                if result.status == "VERIFIED":
+                    operation = transition_operation(
+                        context.run_dir,
+                        operation,
+                        "VERIFIED",
+                        evidence_refs=result.evidence_ids,
+                    )
+                elif result.status == "ROLLED_BACK":
+                    operation = transition_operation(
+                        context.run_dir,
+                        operation,
+                        "ROLLED_BACK",
+                        evidence_refs=result.evidence_ids,
+                    )
+                else:
+                    operation = transition_operation(
+                        context.run_dir,
+                        operation,
+                        "FAILED",
+                        evidence_refs=result.evidence_ids,
+                        error=result.status,
+                    )
+                store_receipt(context.run_dir, key, result)
+            except Exception as exc:
+                transition_operation(
+                    context.run_dir,
+                    operation,
+                    "FAILED",
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+                raise
         post_action = {
             "status": result.status,
             "execution_evidence_ids": list(
