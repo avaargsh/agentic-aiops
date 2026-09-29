@@ -171,6 +171,33 @@ class GoldenIncidentRunner:
                         },
                     ),
                 )
+            if action.approval_required:
+                approval_id = "approval-" + action_key(
+                    runtime_run_id=context.runtime_run_id,
+                    action=action,
+                )[:24]
+                action = OrchestratedAction(
+                    proposal=action.proposal,
+                    selected_path=action.selected_path,
+                    model_confidence=action.model_confidence,
+                    decision_id=action.decision_id,
+                    policy=action.policy,
+                    execution_allowed=action.execution_allowed,
+                    approval_required=action.approval_required,
+                    ledger=DecisionLedgerEntry(
+                        decision_type=action.ledger.decision_type,
+                        selected_action=action.ledger.selected_action,
+                        policy_reason=action.ledger.policy_reason,
+                        evidence_ids=action.ledger.evidence_ids,
+                        confidence=action.ledger.confidence,
+                        requires_approval=action.ledger.requires_approval,
+                        outcome=action.ledger.outcome,
+                        attributes={
+                            **dict(action.ledger.attributes),
+                            "approval_id": approval_id,
+                        },
+                    ),
+                )
             self._freeze(context, bundle, action)
         else:
             bundle, action = frozen
@@ -202,12 +229,25 @@ class GoldenIncidentRunner:
         bundle_ref = context.bundle_ref(bundle_sha256)
         state = runtime.status(run)
         approval_events = list(state.get("approval_events") or [])
+        required_approval_id = (
+            str(action.ledger.attributes.get("approval_id") or "")
+            if action.approval_required
+            else ""
+        )
         approved = any(
             event.get("approved") is True
+            and (
+                not required_approval_id
+                or event.get("approval_id") == required_approval_id
+            )
             for event in approval_events
         )
         denied = any(
             event.get("approved") is False
+            and (
+                not required_approval_id
+                or event.get("approval_id") == required_approval_id
+            )
             for event in approval_events
         )
 
