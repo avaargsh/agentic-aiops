@@ -23,6 +23,7 @@ class OrchestratedAction:
     proposal: ProposedAction
     selected_path: str
     model_confidence: float | None
+    decision_id: str | None
     policy: ActionDecision
     execution_allowed: bool
     approval_required: bool
@@ -80,6 +81,7 @@ class ActionOrchestrator:
 
         selected_path = "fallback"
         confidence = None
+        decision_id = str(response["decision_id"]) if response.get("decision_id") else None
 
         decision = response.get("decision")
         if decision is not None:
@@ -142,6 +144,7 @@ class ActionOrchestrator:
                 "blast_radius": proposal.blast_radius,
                 "approval_ref": approval_ref or "",
                 "evidence_digest": evidence_digest or "",
+                "decision_id": decision_id or "",
             },
         )
 
@@ -149,6 +152,7 @@ class ActionOrchestrator:
             proposal=proposal,
             selected_path=selected_path,
             model_confidence=confidence,
+            decision_id=decision_id,
             policy=policy,
             execution_allowed=execution_allowed,
             approval_required=approval_required,
