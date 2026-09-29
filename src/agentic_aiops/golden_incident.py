@@ -16,6 +16,7 @@ from .ledger import DecisionLedgerEntry
 from .remediation import RemediationResult, SafeRemediationRunner
 from .runner import InvestigationRunner
 from .release_acceptance import write_control_plane_acceptance
+from .action_receipt import action_key, load_receipt, store_receipt
 
 @dataclass(frozen=True)
 class GoldenIncidentEvent:
@@ -217,10 +218,17 @@ class GoldenIncidentRunner:
             runtime.pause(run, evidence_refs=(bundle_ref,))
             return None
 
-        result = self.remediation.run(
-            action,
-            approval_granted=approved,
+        key = action_key(
+            runtime_run_id=context.runtime_run_id,
+            action=action,
         )
+        result = load_receipt(context.run_dir, key)
+        if result is None:
+            result = self.remediation.run(
+                action,
+                approval_granted=approved,
+            )
+            store_receipt(context.run_dir, key, result)
         post_action = {
             "status": result.status,
             "execution_evidence_ids": list(
