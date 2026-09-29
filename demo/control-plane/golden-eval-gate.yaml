@@ -1,0 +1,15 @@
+apiVersion: agentplane.io/v1alpha1
+kind: EvalGate
+metadata:
+  name: golden-incident-acceptance
+spec:
+  suiteRef: agentic-aiops/golden-incident-v1
+  conditions:
+    - metric: recovery_success_rate
+      op: gte
+      value: 1.0
+    - metric: false_automation_rate
+      op: eq
+      value: 0.0
+  evidenceRequired: true
+  onFailure: block
