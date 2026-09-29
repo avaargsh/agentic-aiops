@@ -68,3 +68,9 @@ def test_release_identity_is_frozen_and_completed_with_run(tmp_path):
     assert runtime.result["release_ref"] == "checkout-sre-golden-v1"
     assert runtime.result["runtime_run_id"] == "run-001"
     assert runtime.evidence_refs[0].startswith("evidence://sha256/")
+    assert "artifact://run-001/post-action-evidence.json" in runtime.evidence_refs
+    post_action = json.loads(
+        (tmp_path / "run-001" / "post-action-evidence.json").read_text()
+    )
+    assert post_action["status"] == "VERIFIED"
+    assert post_action["verification_evidence_ids"]
