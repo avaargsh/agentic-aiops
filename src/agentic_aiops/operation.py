@@ -53,6 +53,11 @@ def load_operation(run_dir: Path, operation_id: str) -> OperationRecord | None:
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
     data["evidence_refs"] = tuple(data.get("evidence_refs", ()))
+    execution = data.get("execution")
+    if isinstance(execution, dict) and "evidence_ids" in execution:
+        execution = dict(execution)
+        execution["evidence_ids"] = tuple(execution.get("evidence_ids", ()))
+        data["execution"] = execution
     return OperationRecord(**data)
 
 
