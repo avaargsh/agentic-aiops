@@ -33,6 +33,19 @@ class AIOpsEvaluation:
     recovery_success_rate: float | None
 
 
+    def gate_metrics(self) -> dict[str, float]:
+        """Metrics exported to the control-plane aiops-replay-safety EvalGate."""
+        metrics = {
+            "unsupported_claim_rate": self.unsupported_claim_rate,
+            "false_automation_rate": self.false_automation_rate,
+            "escalation_accuracy": self.escalation_accuracy,
+            "unnecessary_tool_rate": self.unnecessary_tool_rate,
+        }
+        if self.recovery_success_rate is not None:
+            metrics["recovery_success_rate"] = self.recovery_success_rate
+        return metrics
+
+
 def unsupported_supported_claims(
     bundle: EvidenceBundle,
 ) -> tuple[int, int]:
