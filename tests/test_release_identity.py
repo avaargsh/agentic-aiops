@@ -58,6 +58,13 @@ def test_release_identity_is_frozen_and_completed_with_run(tmp_path):
     )
     assert frozen["metadata"]["release_ref"] == "checkout-sre-golden-v1"
     assert frozen["metadata"]["runtime_run_id"] == "run-001"
+    decision = json.loads(
+        (tmp_path / "run-001" / "decision.json").read_text()
+    )
+    assert decision["ledger"]["attributes"]["release_ref"] == "checkout-sre-golden-v1"
+    assert decision["ledger"]["attributes"]["runtime_run_id"] == "run-001"
+    assert decision["ledger"]["attributes"]["evidence_digest"]
+
     assert runtime.result["release_ref"] == "checkout-sre-golden-v1"
     assert runtime.result["runtime_run_id"] == "run-001"
     assert runtime.evidence_refs[0].startswith("evidence://sha256/")
