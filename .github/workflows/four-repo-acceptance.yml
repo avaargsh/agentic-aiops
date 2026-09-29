@@ -2,6 +2,18 @@ name: four-repo-acceptance
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "compose.golden.yml"
+      - "demo/control-plane/**"
+      - "demo/k8s/**"
+      - "examples/live_golden_incident.py"
+      - "scripts/run-acceptance.sh"
+      - "src/agentic_aiops/decision_client.py"
+      - "src/agentic_aiops/durable_runtime.py"
+      - "src/agentic_aiops/golden_incident.py"
+      - "src/agentic_aiops/release_acceptance.py"
+      - ".github/workflows/four-repo-acceptance.yml"
 
 jobs:
   live-acceptance:
