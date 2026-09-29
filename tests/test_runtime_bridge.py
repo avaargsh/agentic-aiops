@@ -55,3 +55,34 @@ def test_runtime_approval_sink_maps_evidence_refs() -> None:
         "evidence://aiops/e-1",
         "evidence://aiops/e-2",
     ]
+
+
+
+def test_golden_incident_uses_canonical_run_and_evidence_refs() -> None:
+    runtime = FakeRuntime()
+    run_id = "golden-checkout-live-001"
+    sink = RuntimeApprovalSink(runtime=runtime, run_id=run_id)
+
+    ref = sink.request(
+        action=ProposedAction(
+            action_kind="scale",
+            target="deployment/checkout",
+            blast_radius="single-workload",
+            rollback_available=True,
+            evidence_ids=("metrics-before", "decision-001"),
+            description="scale checkout after verified saturation",
+        ),
+        evidence_ids=("metrics-before", "decision-001"),
+    )
+
+    assert ref == "approval://approval-123"
+    assert runtime.calls == [
+        {
+            "run_id": run_id,
+            "action": "scale checkout after verified saturation",
+            "evidence_refs": [
+                "evidence://aiops/metrics-before",
+                "evidence://aiops/decision-001",
+            ],
+        }
+    ]
