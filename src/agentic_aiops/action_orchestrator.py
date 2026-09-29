@@ -62,6 +62,8 @@ class ActionOrchestrator:
     def decide(
         self,
         proposal: ProposedAction,
+        *,
+        evidence_digest: str | None = None,
     ) -> OrchestratedAction:
         response = self.decision_client.decide(
             decision_type="escalation",
@@ -72,6 +74,7 @@ class ActionOrchestrator:
                 "blast_radius": proposal.blast_radius,
                 "rollback_available": proposal.rollback_available,
                 "evidence_count": len(proposal.evidence_ids),
+                "evidence_digest": evidence_digest,
             },
         )
 
@@ -138,6 +141,7 @@ class ActionOrchestrator:
                 "target": proposal.target,
                 "blast_radius": proposal.blast_radius,
                 "approval_ref": approval_ref or "",
+                "evidence_digest": evidence_digest or "",
             },
         )
 
