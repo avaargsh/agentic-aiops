@@ -14,7 +14,7 @@ export AGENT_RELEASE_NAME="$RELEASE"
 echo "[1/5] start incident and freeze pre-action evidence"
 python examples/live_golden_incident.py start --run-id "$RUN_ID" --session-id "$SESSION_ID" --prometheus "$PROM" --kube-api "$KUBE" --decision "$DECISION"
 
-APPROVAL_ID=$(python examples/live_golden_incident.py status --run-id "$RUN_ID" --session-id "$SESSION_ID" | python -c 'import json,sys; d=json.load(sys.stdin); xs=d.get("pending_approval_ids") or []; print(xs[0] if xs else "approval-001")')
+APPROVAL_ID=$(python examples/live_golden_incident.py status --run-id "$RUN_ID" --session-id "$SESSION_ID" | python -c 'import json,sys; d=json.load(sys.stdin); xs=d.get("pending_approval_ids") or []; assert len(xs)==1, f"expected exactly one pending approval, got {xs}"; print(xs[0])')
 
 echo "[2/5] approve exact durable run action: $APPROVAL_ID"
 golden-approval approve --run-id "$RUN_ID" --session-id "$SESSION_ID" --approval-id "$APPROVAL_ID" --reason "four-repo acceptance"
