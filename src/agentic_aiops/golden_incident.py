@@ -111,6 +111,7 @@ class GoldenIncidentRunner:
             proposal=proposal,
             selected_path=data["selected_path"],
             model_confidence=data.get("model_confidence"),
+            decision_id=data.get("decision_id"),
             policy=policy,
             execution_allowed=data["execution_allowed"],
             approval_required=data["approval_required"],
