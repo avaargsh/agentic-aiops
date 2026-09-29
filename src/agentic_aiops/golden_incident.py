@@ -57,8 +57,9 @@ class GoldenIncidentRunner:
         events = [self._event("incident", "received", severity=incident.severity)]
         investigation = self.investigation.run(incident)
         bundle = investigation.bundle
+        bundle.metadata["schema_version"] = "aiops.evidence/v1"
         bundle_sha256 = bundle.sha256()
-        bundle.metadata.update({"schema_version": "aiops.evidence/v1", "bundle_sha256": bundle_sha256})
+        bundle.metadata["bundle_sha256"] = bundle_sha256
         events.append(self._event("investigation", "collected", evidence_count=len(bundle.evidence), bundle_sha256=bundle_sha256))
         proposal = self.proposal_fn(bundle)
         action = self.orchestrator.decide(proposal)
@@ -132,8 +133,9 @@ class GoldenIncidentRunner:
         if frozen is None:
             investigation = self.investigation.run(incident)
             bundle = investigation.bundle
+            bundle.metadata["schema_version"] = "aiops.evidence/v1"
             bundle_sha256 = bundle.sha256()
-            bundle.metadata.update({"schema_version": "aiops.evidence/v1", "bundle_sha256": bundle_sha256})
+            bundle.metadata["bundle_sha256"] = bundle_sha256
             proposal = self.proposal_fn(bundle)
             action = self.orchestrator.decide(proposal)
             self._freeze(context, bundle, action)
