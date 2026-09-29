@@ -18,7 +18,8 @@ on:
 
 jobs:
   live-acceptance:
-    if: ${{ secrets.GOLDEN_STACK_REPO_TOKEN != '' }}
+    # Do not hide a missing cross-repo credential behind a skipped job.
+    # Let checkout fail visibly so M1 always has an auditable CI result.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
