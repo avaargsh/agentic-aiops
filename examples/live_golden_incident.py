@@ -34,7 +34,11 @@ def main():
     parser.add_argument("--decision", default=os.environ.get("DECISION_GATEWAY_URL", "http://127.0.0.1:8080"))
     args = parser.parse_args()
     runtime = build_temporal_port()
-    context = DurableRunContext(args.run_id, args.session_id)
+    context = DurableRunContext(
+        args.run_id,
+        args.session_id,
+        release_ref=os.environ.get("AGENT_RELEASE_NAME"),
+    )
     run = runtime.start_or_attach(runtime_run_id=args.run_id, session_id=args.session_id)
     if args.command == "status":
         print(json.dumps(runtime.status(run), indent=2, default=str)); return
