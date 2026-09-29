@@ -55,10 +55,10 @@ def test_continue_uses_frozen_evidence_and_decision_without_live_reread(tmp_path
         investigation_calls += 1
         return original_investigation(incident)
 
-    def counted_decide(proposal):
+    def counted_decide(proposal, **kwargs):
         nonlocal decision_calls
         decision_calls += 1
-        return original_decide(proposal)
+        return original_decide(proposal, **kwargs)
 
     runner.investigation.run = counted_investigation
     runner.orchestrator.decide = counted_decide

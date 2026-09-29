@@ -14,6 +14,7 @@ class DurableRunPort(Protocol):
 class DurableRunContext:
     runtime_run_id: str
     session_id: str
+    release_ref: str | None = None
     evidence_uri_prefix: str = "evidence://sha256"
     artifact_root: str | Path = ".golden-runs"
 

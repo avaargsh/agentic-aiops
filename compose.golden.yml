@@ -24,6 +24,14 @@ services:
     ports:
       - "7233:7233"
 
+  control-plane-plan:
+    build:
+      context: ../agent-control-plane
+    volumes:
+      - ./demo/control-plane:/workspace:ro
+    command: ["plan", "/workspace/golden-release.yaml"]
+    profiles: ["demo"]
+
   decision-gateway:
     build:
       context: ../agent-decision-lab
@@ -47,9 +55,15 @@ services:
       - DECISION_GATEWAY_URL=http://decision-gateway:8080
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_TASK_QUEUE=agent-runs
+      - AGENT_RELEASE_NAME=checkout-sre-golden-v1
     depends_on:
-      - temporal
-      - decision-gateway
-      - runtime-worker
+      control-plane-plan:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_started
+      decision-gateway:
+        condition: service_started
+      runtime-worker:
+        condition: service_started
     profiles: ["demo"]
     command: ["python", "examples/golden_incident_checkout.py"]

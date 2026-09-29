@@ -15,6 +15,8 @@ from .policy import ActionDecision
 from .ledger import DecisionLedgerEntry
 from .remediation import RemediationResult, SafeRemediationRunner
 from .runner import InvestigationRunner
+from .release_acceptance import write_control_plane_acceptance
+from .action_receipt import action_key, load_receipt, store_receipt
 
 @dataclass(frozen=True)
 class GoldenIncidentEvent:
@@ -135,14 +137,67 @@ class GoldenIncidentRunner:
             investigation = self.investigation.run(incident)
             bundle = investigation.bundle
             bundle.metadata["schema_version"] = "aiops.evidence/v1"
+            if context.release_ref:
+                bundle.metadata["release_ref"] = context.release_ref
+                bundle.metadata["runtime_run_id"] = context.runtime_run_id
             bundle_sha256 = bundle.sha256()
             bundle.metadata["bundle_sha256"] = bundle_sha256
             proposal = self.proposal_fn(bundle)
-            action = self.orchestrator.decide(proposal)
+            action = self.orchestrator.decide(
+                proposal,
+                evidence_digest=bundle_sha256,
+            )
+            if context.release_ref:
+                action = OrchestratedAction(
+                    proposal=action.proposal,
+                    selected_path=action.selected_path,
+                    model_confidence=action.model_confidence,
+                    decision_id=action.decision_id,
+                    policy=action.policy,
+                    execution_allowed=action.execution_allowed,
+                    approval_required=action.approval_required,
+                    ledger=DecisionLedgerEntry(
+                        decision_type=action.ledger.decision_type,
+                        selected_action=action.ledger.selected_action,
+                        policy_reason=action.ledger.policy_reason,
+                        evidence_ids=action.ledger.evidence_ids,
+                        confidence=action.ledger.confidence,
+                        requires_approval=action.ledger.requires_approval,
+                        outcome=action.ledger.outcome,
+                        attributes={
+                            **dict(action.ledger.attributes),
+                            "release_ref": context.release_ref,
+                            "runtime_run_id": context.runtime_run_id,
+                        },
+                    ),
+                )
             self._freeze(context, bundle, action)
         else:
             bundle, action = frozen
             bundle_sha256 = bundle.sha256()
+            frozen_release = bundle.metadata.get("release_ref")
+            frozen_run = bundle.metadata.get("runtime_run_id")
+            if context.release_ref and frozen_release != context.release_ref:
+                raise RuntimeError(
+                    "frozen evidence release_ref does not match durable run context"
+                )
+            if frozen_run and frozen_run != context.runtime_run_id:
+                raise RuntimeError(
+                    "frozen evidence runtime_run_id does not match durable run context"
+                )
+            ledger_attrs = dict(action.ledger.attributes)
+            if frozen_release and ledger_attrs.get("release_ref") != frozen_release:
+                raise RuntimeError(
+                    "decision ledger release_ref does not match frozen evidence"
+                )
+            if frozen_run and ledger_attrs.get("runtime_run_id") != frozen_run:
+                raise RuntimeError(
+                    "decision ledger runtime_run_id does not match frozen evidence"
+                )
+            if ledger_attrs.get("evidence_digest") != bundle_sha256:
+                raise RuntimeError(
+                    "decision ledger evidence_digest does not match frozen evidence"
+                )
 
         bundle_ref = context.bundle_ref(bundle_sha256)
         state = runtime.status(run)
@@ -163,10 +218,56 @@ class GoldenIncidentRunner:
             runtime.pause(run, evidence_refs=(bundle_ref,))
             return None
 
-        result = self.remediation.run(
-            action,
-            approval_granted=approved,
+        key = action_key(
+            runtime_run_id=context.runtime_run_id,
+            action=action,
         )
+        result = load_receipt(context.run_dir, key)
+        if result is None:
+            result = self.remediation.run(
+                action,
+                approval_granted=approved,
+            )
+            store_receipt(context.run_dir, key, result)
+        post_action = {
+            "status": result.status,
+            "execution_evidence_ids": list(
+                result.execution.evidence_ids
+                if result.execution is not None else ()
+            ),
+            "verification_evidence_ids": list(
+                result.verification.evidence_ids
+                if result.verification is not None else ()
+            ),
+            "verification_summary": (
+                result.verification.summary
+                if result.verification is not None else None
+            ),
+            "rollback_evidence_ids": list(
+                result.rollback.evidence_ids
+                if result.rollback is not None else ()
+            ),
+        }
+        run_dir = context.run_dir
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "post-action-evidence.json").write_text(
+            json.dumps(post_action, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        post_action_ref = (
+            f"artifact://{context.runtime_run_id}/post-action-evidence.json"
+        )
+
+        if context.release_ref:
+            write_control_plane_acceptance(
+                run_dir,
+                release_ref=context.release_ref,
+                runtime_run_id=context.runtime_run_id,
+                bundle_sha256=bundle_sha256,
+                remediation_status=result.status,
+                post_action_ref=post_action_ref,
+            )
+
         runtime.complete(
             run,
             result={
@@ -174,8 +275,14 @@ class GoldenIncidentRunner:
                 "bundle_sha256": bundle_sha256,
                 "decision": action.selected_path,
                 "remediation_status": result.status,
+                "release_ref": context.release_ref,
+                "runtime_run_id": context.runtime_run_id,
             },
-            evidence_refs=(bundle_ref, *result.evidence_ids),
+            evidence_refs=(
+                bundle_ref,
+                post_action_ref,
+                *result.evidence_ids,
+            ),
         )
 
         return GoldenIncidentResult(
