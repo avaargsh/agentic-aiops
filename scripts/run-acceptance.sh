@@ -11,6 +11,32 @@ RUN_DIR=".golden-runs/${RUN_ID}"
 
 export AGENT_RELEASE_NAME="$RELEASE"
 
+cleanup() {
+  if [[ -n "${PROM_PF_PID:-}" ]]; then kill "$PROM_PF_PID" 2>/dev/null || true; fi
+  if [[ -n "${KUBE_PROXY_PID:-}" ]]; then kill "$KUBE_PROXY_PID" 2>/dev/null || true; fi
+}
+trap cleanup EXIT
+
+wait_http() {
+  local url="$1"
+  for _ in $(seq 1 60); do
+    if curl -fsS "$url" >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  echo "endpoint not ready: $url" >&2
+  return 1
+}
+
+echo "[0/5] verify live dependencies"
+kubectl -n golden-demo get deploy checkout-api >/dev/null
+kubectl -n golden-demo port-forward svc/prometheus 19090:9090 >"$RUN_DIR-prometheus-pf.log" 2>&1 &
+PROM_PF_PID=$!
+kubectl proxy --port=18001 >"$RUN_DIR-kube-proxy.log" 2>&1 &
+KUBE_PROXY_PID=$!
+wait_http "$PROM/-/ready"
+wait_http "$KUBE/version"
+wait_http "$DECISION/health" || wait_http "$DECISION/docs"
+
 echo "[1/5] start incident and freeze pre-action evidence"
 python examples/live_golden_incident.py start --run-id "$RUN_ID" --session-id "$SESSION_ID" --prometheus "$PROM" --kube-api "$KUBE" --decision "$DECISION"
 
