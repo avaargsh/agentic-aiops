@@ -7,7 +7,7 @@ RELEASE=${AGENT_RELEASE_NAME:-checkout-sre-golden-v1}
 PROM=${PROMETHEUS_URL:-http://127.0.0.1:19090}
 KUBE=${KUBERNETES_API:-http://127.0.0.1:18001}
 DECISION=${DECISION_GATEWAY_URL:-http://127.0.0.1:8080}
-RUN_DIR=".artifacts/runs/${RUN_ID}"
+RUN_DIR=".golden-runs/${RUN_ID}"
 
 export AGENT_RELEASE_NAME="$RELEASE"
 
