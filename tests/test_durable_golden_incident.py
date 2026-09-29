@@ -76,3 +76,67 @@ def test_continue_uses_frozen_evidence_and_decision_without_live_reread(tmp_path
     assert result.remediation.status == "VERIFIED"
     assert investigation_calls == 1
     assert decision_calls == 1
+
+
+
+def test_golden_incident_contract_preserves_release_run_runtime_and_evidence_identity(tmp_path):
+    runtime = Runtime()
+    run_id = "golden-checkout-live-001"
+    session_id = "session://golden-checkout-live-001"
+    release_ref = "release://sre-rca-agent-v1"
+    ctx = DurableRunContext(run_id, session_id, artifact_root=tmp_path)
+    incident = Incident("inc-001", "checkout latency", "sev2")
+    runner = build_runner()
+
+    # Control Plane Run identity is the durable anchor. Release identity is
+    # intentionally carried beside runtime state rather than owned by AIOps.
+    control_plane_run = {
+        "metadata": {"id": run_id},
+        "spec": {
+            "sessionRef": session_id,
+            "releaseRef": release_ref,
+            "workflowRef": f"temporal://{run_id}",
+            "sandboxRef": f"sandbox://{run_id}",
+            "status": "running",
+            "evidenceRefs": [],
+        },
+    }
+
+    assert runner.run_durable(incident, runtime=runtime, context=ctx) is None
+    start = runtime.events[0]
+    assert start == (
+        "start",
+        {"runtime_run_id": run_id, "session_id": session_id},
+    )
+
+    pause = runtime.events[-1]
+    assert pause[0] == "pause"
+    frozen_bundle_ref = pause[1][0]
+    assert frozen_bundle_ref.startswith("evidence://sha256/")
+    control_plane_run["spec"]["status"] = "paused"
+    control_plane_run["spec"]["evidenceRefs"] = [frozen_bundle_ref]
+
+    runtime.state["approval_events"] = [
+        {"approval_id": "approval-001", "approved": True}
+    ]
+    result = runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=ctx,
+    )
+
+    assert result is not None
+    complete = runtime.events[-1]
+    assert complete[0] == "complete"
+    assert complete[1]["incident_id"] == incident.incident_id
+    assert complete[2][0] == frozen_bundle_ref
+
+    control_plane_run["spec"]["status"] = "succeeded"
+    control_plane_run["spec"]["evidenceRefs"] = list(complete[2])
+
+    assert control_plane_run["metadata"]["id"] == run_id
+    assert control_plane_run["spec"]["releaseRef"] == release_ref
+    assert control_plane_run["spec"]["workflowRef"] == f"temporal://{run_id}"
+    assert control_plane_run["spec"]["sandboxRef"] == f"sandbox://{run_id}"
+    assert frozen_bundle_ref in control_plane_run["spec"]["evidenceRefs"]
+    assert control_plane_run["spec"]["status"] == "succeeded"
