@@ -8,22 +8,29 @@ from test_golden_incident import build_runner
 
 def test_release_identity_is_consistent_across_frozen_decision_and_acceptance(tmp_path):
     runtime = Runtime()
-    runtime.state["approval_events"] = [{"approval_id": "approval-1", "approved": True}]
     ctx = DurableRunContext(
         "run-golden-001",
         "session-golden-001",
         artifact_root=tmp_path,
         release_ref="checkout-sre-golden-v1",
     )
+    runner = build_runner()
+    incident = Incident("inc-001", "checkout latency", "sev2")
 
-    result = build_runner().run_durable(
-        Incident("inc-001", "checkout latency", "sev2"),
-        runtime=runtime,
-        context=ctx,
-    )
+    # First durable pass must freeze evidence and pause on the exact
+    # deterministic approval identity produced for this action.
+    assert runner.run_durable(incident, runtime=runtime, context=ctx) is None
+    run_dir = tmp_path / ctx.runtime_run_id
+    frozen_decision = json.loads((run_dir / "decision.json").read_text())
+    approval_id = frozen_decision["ledger"]["attributes"]["approval_id"]
+    assert approval_id.startswith("approval-")
+
+    runtime.state["approval_events"] = [
+        {"approval_id": approval_id, "approved": True}
+    ]
+    result = runner.run_durable(incident, runtime=runtime, context=ctx)
 
     assert result is not None
-    run_dir = tmp_path / ctx.runtime_run_id
     bundle = json.loads((run_dir / "evidence-bundle.json").read_text())
     decision = json.loads((run_dir / "decision.json").read_text())
     release = json.loads((run_dir / "release-evidence.json").read_text())
@@ -33,6 +40,7 @@ def test_release_identity_is_consistent_across_frozen_decision_and_acceptance(tm
     assert bundle["metadata"]["runtime_run_id"] == ctx.runtime_run_id
     assert decision["ledger"]["attributes"]["release_ref"] == ctx.release_ref
     assert decision["ledger"]["attributes"]["runtime_run_id"] == ctx.runtime_run_id
+    assert decision["ledger"]["attributes"]["approval_id"] == approval_id
     assert release["release_ref"] == ctx.release_ref
     assert release["runtime_run_id"] == ctx.runtime_run_id
     assert complete["release_ref"] == ctx.release_ref
