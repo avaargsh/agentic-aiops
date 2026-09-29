@@ -26,7 +26,7 @@ Keep these repositories as siblings:
 
 ## Contract
 
-The runtime produces three durable acceptance artifacts under `.artifacts/runs/<run-id>/`:
+The runtime produces three durable acceptance artifacts under `.golden-runs/<run-id>/`:
 
 - `post-action-evidence.json`
 - `release-evidence.json`
