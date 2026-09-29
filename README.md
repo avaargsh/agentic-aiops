@@ -48,14 +48,23 @@ Start the supporting Temporal / Decision services using `compose.golden.yml`, th
 ./scripts/run-live-golden-incident.sh
 ```
 
-The start command returns control after the Run reaches durable approval. Approve with a stable approval ID:
+The start command returns control after the Run reaches durable approval. Query the frozen Decision for the exact pending approval ID:
+
+```bash
+python examples/live_golden_incident.py status \
+  --run-id golden-checkout-live-001
+```
+
+Then approve that exact ID:
 
 ```bash
 golden-approval approve \
   --run-id golden-checkout-live-001 \
-  --approval-id approval-001 \
+  --approval-id <pending_approval_id> \
   --reason "scale checkout-api"
 ```
+
+An approval for another action does not authorize this Run's frozen action.
 
 Then continue the same Run:
 
@@ -74,7 +83,7 @@ See `docs/golden-incident-v0.1.md` for the recording path and `docs/golden-stack
 [EVIDENCE]      evidence://sha256/<bundle>
 [DECISION]      execute / scale deployment/checkout-api
 [GOVERN]        WAIT_APPROVAL (no Kubernetes write)
-[APPROVAL]      approval-001 approved
+[APPROVAL]      exact frozen action approval_id approved
 [ACTION]        replicas 2 -> 4; rollout ready
 [VERIFY]        post-action latency <= SLO
 [COMPLETE]      Temporal Run terminal; Evidence Refs attached
@@ -88,7 +97,7 @@ This is the acceptance transcript, not a pre-recorded success claim: a real run 
 - Evidence is collected before hypotheses and decisions.
 - Investigation tools are read-only; write capability lives behind a separate executor.
 - A model decision never bypasses deterministic authorization.
-- Approval uses a stable `approval_id`; Temporal owns signal deduplication.
+- Approval uses a stable action-bound `approval_id`; an unrelated approval cannot authorize the frozen action, and Temporal owns signal deduplication.
 - The AIOps process does not poll while waiting for human approval.
 - Successful `kubectl scale` is not treated as recovery: Prometheus must verify the post-action SLO.
 - Failed verification can trigger rollback.
