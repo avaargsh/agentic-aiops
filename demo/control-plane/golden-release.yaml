@@ -1,0 +1,64 @@
+apiVersion: agentplane.io/v1alpha1
+kind: AgentBundle
+metadata:
+  name: checkout-sre
+  labels:
+    workload: golden-incident
+spec:
+  entrypoint: sre.checkout-investigate
+  capabilities:
+    - prometheus.query
+    - kubernetes.read
+    - kubernetes.scale
+---
+apiVersion: agentplane.io/v1alpha1
+kind: RuntimeBinding
+metadata:
+  name: checkout-tools
+spec:
+  type: tool
+  provider: mcp
+  endpointRef: golden-aiops
+  config:
+    evidenceFirst: true
+---
+apiVersion: agentplane.io/v1alpha1
+kind: RuntimeBinding
+metadata:
+  name: checkout-workflow
+spec:
+  type: workflow
+  provider: temporal
+  endpointRef: temporal
+  dependsOn:
+    - checkout-tools
+  config:
+    taskQueue: agent-runs
+---
+apiVersion: agentplane.io/v1alpha1
+kind: RuntimeBinding
+metadata:
+  name: checkout-decision
+spec:
+  type: decision
+  provider: decision-gateway
+  endpointRef: http://decision-gateway:8080
+  dependsOn:
+    - checkout-workflow
+  config:
+    decisionType: mcp_tool_router
+---
+apiVersion: agentplane.io/v1alpha1
+kind: AgentRelease
+metadata:
+  name: checkout-sre-golden-v1
+spec:
+  bundleRef: checkout-sre
+  version: v1
+  bindings:
+    - checkout-tools
+    - checkout-workflow
+    - checkout-decision
+  placement:
+    environment: local-kind
+    namespace: golden-demo
