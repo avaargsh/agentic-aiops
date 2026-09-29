@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Literal
+
+OperationPhase = Literal["PREPARED", "APPLIED", "VERIFIED", "ROLLED_BACK", "FAILED"]
+
+
+@dataclass(frozen=True)
+class OperationRecord:
+    operation_id: str
+    phase: OperationPhase
+    runtime_run_id: str
+    decision_id: str
+    action_kind: str
+    target: str
+    evidence_digest: str
+    desired_state: dict[str, object]
+    evidence_refs: tuple[str, ...] = ()
+    error: str | None = None
+
+
+def operation_path(run_dir: Path, operation_id: str) -> Path:
+    return run_dir / "operations" / f"{operation_id}.json"
+
+
+def load_operation(run_dir: Path, operation_id: str) -> OperationRecord | None:
+    path = operation_path(run_dir, operation_id)
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["evidence_refs"] = tuple(data.get("evidence_refs", ()))
+    return OperationRecord(**data)
+
+
+def store_operation(run_dir: Path, record: OperationRecord) -> Path:
+    path = operation_path(run_dir, record.operation_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(asdict(record), indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def transition_operation(
+    run_dir: Path,
+    record: OperationRecord,
+    phase: OperationPhase,
+    *,
+    evidence_refs: tuple[str, ...] | None = None,
+    error: str | None = None,
+) -> OperationRecord:
+    updated = OperationRecord(
+        operation_id=record.operation_id,
+        phase=phase,
+        runtime_run_id=record.runtime_run_id,
+        decision_id=record.decision_id,
+        action_kind=record.action_kind,
+        target=record.target,
+        evidence_digest=record.evidence_digest,
+        desired_state=dict(record.desired_state),
+        evidence_refs=record.evidence_refs if evidence_refs is None else evidence_refs,
+        error=error,
+    )
+    store_operation(run_dir, updated)
+    return updated
