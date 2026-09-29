@@ -24,9 +24,13 @@ def freeze(tmp_path):
         runtime=runtime,
         context=ctx,
     ) is None
-    runtime.state["approval_events"] = [
-        {"approval_id": "approval-001", "approved": True}
-    ]
+    decision = json.loads(
+        (tmp_path / "run-001" / "decision.json").read_text()
+    )
+    runtime.state["approval_events"] = [{
+        "approval_id": decision["ledger"]["attributes"]["approval_id"],
+        "approved": True,
+    }]
     return runner, runtime, ctx
 
 
