@@ -62,7 +62,7 @@ class GoldenIncidentRunner:
         bundle.metadata["bundle_sha256"] = bundle_sha256
         events.append(self._event("investigation", "collected", evidence_count=len(bundle.evidence), bundle_sha256=bundle_sha256))
         proposal = self.proposal_fn(bundle)
-        action = self.orchestrator.decide(proposal)
+        action = self.orchestrator.decide(proposal, evidence_digest=bundle_sha256)
         events.append(self._event("decision", action.selected_path, confidence=action.model_confidence, approval_required=action.approval_required))
         if action.approval_required:
             events.append(self._event("approval", "granted" if approval_granted else "required"))
