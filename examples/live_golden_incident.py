@@ -41,7 +41,24 @@ def main():
     )
     run = runtime.start_or_attach(runtime_run_id=args.run_id, session_id=args.session_id)
     if args.command == "status":
-        print(json.dumps(runtime.status(run), indent=2, default=str)); return
+        status = runtime.status(run)
+        decision_path = context.run_dir / "decision.json"
+        pending = []
+        if decision_path.exists():
+            decision = json.loads(decision_path.read_text(encoding="utf-8"))
+            approval_id = (
+                decision.get("ledger", {})
+                .get("attributes", {})
+                .get("approval_id")
+            )
+            resolved = {
+                str(item.get("approval_id"))
+                for item in status.get("approval_events", [])
+            }
+            if approval_id and approval_id not in resolved:
+                pending.append(approval_id)
+        status["pending_approval_ids"] = pending
+        print(json.dumps(status, indent=2, default=str)); return
     state = runtime.status(run)
     events = list(state.get("approval_events") or [])
     if args.command == "continue" and not any(e.get("approved") is True for e in events):
