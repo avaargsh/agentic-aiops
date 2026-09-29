@@ -5,7 +5,25 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
-OperationPhase = Literal["PREPARED", "APPLIED", "VERIFIED", "ROLLED_BACK", "FAILED"]
+OperationPhase = Literal[
+    "PREPARED",
+    "APPLIED",
+    "VERIFIED",
+    "ROLLED_BACK",
+    "EXECUTION_FAILED",
+    "VERIFICATION_FAILED",
+    "ROLLBACK_FAILED",
+    "RECOVERY_REQUIRED",
+]
+
+TERMINAL_OPERATION_PHASES = {
+    "VERIFIED",
+    "ROLLED_BACK",
+    "EXECUTION_FAILED",
+    "VERIFICATION_FAILED",
+    "ROLLBACK_FAILED",
+    "RECOVERY_REQUIRED",
+}
 
 
 @dataclass(frozen=True)
@@ -19,7 +37,10 @@ class OperationRecord:
     evidence_digest: str
     desired_state: dict[str, object]
     evidence_refs: tuple[str, ...] = ()
+    execution: dict[str, object] | None = None
+    result: dict[str, object] | None = None
     error: str | None = None
+    attempt: int = 0
 
 
 def operation_path(run_dir: Path, operation_id: str) -> Path:
@@ -50,8 +71,15 @@ def transition_operation(
     phase: OperationPhase,
     *,
     evidence_refs: tuple[str, ...] | None = None,
+    execution: dict[str, object] | None = None,
+    result: dict[str, object] | None = None,
     error: str | None = None,
+    increment_attempt: bool = False,
 ) -> OperationRecord:
+    if record.phase in TERMINAL_OPERATION_PHASES and phase != record.phase:
+        raise ValueError(
+            f"terminal operation {record.operation_id} cannot transition from {record.phase} to {phase}"
+        )
     updated = OperationRecord(
         operation_id=record.operation_id,
         phase=phase,
@@ -62,7 +90,10 @@ def transition_operation(
         evidence_digest=record.evidence_digest,
         desired_state=dict(record.desired_state),
         evidence_refs=record.evidence_refs if evidence_refs is None else evidence_refs,
+        execution=record.execution if execution is None else dict(execution),
+        result=record.result if result is None else dict(result),
         error=error,
+        attempt=record.attempt + 1 if increment_attempt else record.attempt,
     )
     store_operation(run_dir, updated)
     return updated
