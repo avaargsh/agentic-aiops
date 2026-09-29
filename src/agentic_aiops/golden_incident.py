@@ -197,6 +197,35 @@ class GoldenIncidentRunner:
             action,
             approval_granted=approved,
         )
+        post_action = {
+            "status": result.status,
+            "execution_evidence_ids": list(
+                result.execution.evidence_ids
+                if result.execution is not None else ()
+            ),
+            "verification_evidence_ids": list(
+                result.verification.evidence_ids
+                if result.verification is not None else ()
+            ),
+            "verification_summary": (
+                result.verification.summary
+                if result.verification is not None else None
+            ),
+            "rollback_evidence_ids": list(
+                result.rollback.evidence_ids
+                if result.rollback is not None else ()
+            ),
+        }
+        run_dir = context.run_dir
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "post-action-evidence.json").write_text(
+            json.dumps(post_action, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        post_action_ref = (
+            f"artifact://{context.runtime_run_id}/post-action-evidence.json"
+        )
+
         runtime.complete(
             run,
             result={
@@ -207,7 +236,11 @@ class GoldenIncidentRunner:
                 "release_ref": context.release_ref,
                 "runtime_run_id": context.runtime_run_id,
             },
-            evidence_refs=(bundle_ref, *result.evidence_ids),
+            evidence_refs=(
+                bundle_ref,
+                post_action_ref,
+                *result.evidence_ids,
+            ),
         )
 
         return GoldenIncidentResult(
