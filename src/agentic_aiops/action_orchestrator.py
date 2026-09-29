@@ -71,7 +71,8 @@ class ActionOrchestrator:
                 "target": proposal.target,
                 "blast_radius": proposal.blast_radius,
                 "rollback_available": proposal.rollback_available,
-                "evidence_count": len(proposal.evidence_ids),\n                "evidence_digest": evidence_digest,
+                "evidence_count": len(proposal.evidence_ids),
+                "evidence_digest": evidence_digest,
             },
         )
 
@@ -137,7 +138,8 @@ class ActionOrchestrator:
             attributes={
                 "target": proposal.target,
                 "blast_radius": proposal.blast_radius,
-                "approval_ref": approval_ref or "",\n                "evidence_digest": evidence_digest or "",
+                "approval_ref": approval_ref or "",
+                "evidence_digest": evidence_digest or "",
             },
         )
 
