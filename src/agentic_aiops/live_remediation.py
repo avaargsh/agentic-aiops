@@ -28,10 +28,36 @@ class KubectlScaleExecutor:
         kind, _, name = action.target.partition("/")
         if kind.lower() != "deployment" or not name:
             raise ValueError(f"unsupported scale target: {action.target}")
-        self._run("-n", self.namespace, "scale", "deployment", name, f"--replicas={self.after_replicas}")
-        self._run("-n", self.namespace, "rollout", "status", "deployment", name, "--timeout=180s")
-        observed = self._run("-n", self.namespace, "get", "deployment", name, "-o", "jsonpath={.status.readyReplicas}")
-        return ExecutionResult(True, action.target, (f"k8s://{self.namespace}/{action.target}/ready-replicas/{observed}",))
+
+        # Reconcile desired state instead of assuming every retry needs a write.
+        # This closes the common crash window where the Kubernetes mutation
+        # succeeded but the caller died before persisting its local receipt.
+        desired = self._run(
+            "-n", self.namespace, "get", "deployment", name,
+            "-o", "jsonpath={.spec.replicas}",
+        )
+        changed = desired != str(self.after_replicas)
+        if changed:
+            self._run(
+                "-n", self.namespace, "scale", "deployment", name,
+                f"--replicas={self.after_replicas}",
+            )
+        self._run(
+            "-n", self.namespace, "rollout", "status", "deployment", name,
+            "--timeout=180s",
+        )
+        observed = self._run(
+            "-n", self.namespace, "get", "deployment", name,
+            "-o", "jsonpath={.status.readyReplicas}",
+        )
+        return ExecutionResult(
+            changed,
+            action.target,
+            (
+                f"k8s://{self.namespace}/{action.target}/desired-replicas/{desired}",
+                f"k8s://{self.namespace}/{action.target}/ready-replicas/{observed}",
+            ),
+        )
 
     def rollback(self, action: ProposedAction, execution: ExecutionResult) -> RollbackResult:
         _, _, name = action.target.partition("/")
