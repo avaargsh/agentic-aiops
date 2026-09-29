@@ -141,7 +141,34 @@ class GoldenIncidentRunner:
             bundle_sha256 = bundle.sha256()
             bundle.metadata["bundle_sha256"] = bundle_sha256
             proposal = self.proposal_fn(bundle)
-            action = self.orchestrator.decide(proposal)
+            action = self.orchestrator.decide(
+                proposal,
+                evidence_digest=bundle_sha256,
+            )
+            if context.release_ref:
+                action = OrchestratedAction(
+                    proposal=action.proposal,
+                    selected_path=action.selected_path,
+                    model_confidence=action.model_confidence,
+                    decision_id=action.decision_id,
+                    policy=action.policy,
+                    execution_allowed=action.execution_allowed,
+                    approval_required=action.approval_required,
+                    ledger=DecisionLedgerEntry(
+                        decision_type=action.ledger.decision_type,
+                        selected_action=action.ledger.selected_action,
+                        policy_reason=action.ledger.policy_reason,
+                        evidence_ids=action.ledger.evidence_ids,
+                        confidence=action.ledger.confidence,
+                        requires_approval=action.ledger.requires_approval,
+                        outcome=action.ledger.outcome,
+                        attributes={
+                            **dict(action.ledger.attributes),
+                            "release_ref": context.release_ref,
+                            "runtime_run_id": context.runtime_run_id,
+                        },
+                    ),
+                )
             self._freeze(context, bundle, action)
         else:
             bundle, action = frozen
