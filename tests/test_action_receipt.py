@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from agentic_aiops.durable_runtime import DurableRunContext
 from agentic_aiops.models import Incident
 from test_durable_golden_incident import Runtime
@@ -8,9 +10,6 @@ from test_golden_incident import build_runner
 
 def test_retry_after_completed_action_reuses_receipt(tmp_path):
     runtime = Runtime()
-    runtime.state["approval_events"] = [
-        {"approval_id": "approval-001", "approved": True}
-    ]
     runner = build_runner()
     calls = 0
     original = runner.remediation.run
@@ -29,6 +28,16 @@ def test_retry_after_completed_action_reuses_receipt(tmp_path):
     )
     incident = Incident("inc-001", "checkout latency", "sev2")
 
+    assert runner.run_durable(
+        incident, runtime=runtime, context=ctx
+    ) is None
+    decision = json.loads(
+        (tmp_path / "run-001" / "decision.json").read_text()
+    )
+    runtime.state["approval_events"] = [{
+        "approval_id": decision["ledger"]["attributes"]["approval_id"],
+        "approved": True,
+    }]
     first = runner.run_durable(
         incident, runtime=runtime, context=ctx
     )
