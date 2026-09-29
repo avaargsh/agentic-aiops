@@ -1,0 +1,151 @@
+name: four-repo-acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "compose.golden.yml"
+      - "demo/control-plane/**"
+      - "demo/k8s/**"
+      - "examples/live_golden_incident.py"
+      - "scripts/run-acceptance.sh"
+      - "src/agentic_aiops/decision_client.py"
+      - "src/agentic_aiops/durable_runtime.py"
+      - "src/agentic_aiops/golden_incident.py"
+      - "src/agentic_aiops/release_acceptance.py"
+      - ".github/workflows/four-repo-acceptance.yml"
+
+jobs:
+  live-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout agentic-aiops
+        uses: actions/checkout@v4
+        with:
+          path: agentic-aiops
+
+      - name: Checkout Agent Control Plane
+        uses: actions/checkout@v4
+        with:
+          repository: avaargsh/agent-control-plane
+          path: agent-control-plane
+
+      - name: Checkout Cloud Agent Runtime
+        uses: actions/checkout@v4
+        with:
+          repository: avaargsh/cloud-agent-runtime
+          path: cloud-agent-runtime
+
+      - name: Checkout Decision Lab
+        uses: actions/checkout@v4
+        with:
+          repository: avaargsh/agent-decision-lab
+          path: agent-decision-lab
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: helm/kind-action@v1.12.0
+        with:
+          cluster_name: golden-aiops
+
+      - name: Install live acceptance packages
+        working-directory: agentic-aiops
+        run: |
+          pip install -e '../cloud-agent-runtime[temporal]'
+          pip install -e '.[dev,temporal]'
+
+      - name: Build acceptance services
+        working-directory: agentic-aiops
+        run: make acceptance-build
+
+      - name: Start Temporal and Decision Gateway
+        working-directory: agentic-aiops
+        run: |
+          docker compose -f compose.golden.yml up -d postgresql temporal decision-gateway runtime-worker
+          for i in $(seq 1 60); do
+            if python - <<'PY'
+          import socket
+          for host, port in [('127.0.0.1', 7233), ('127.0.0.1', 8080)]:
+              with socket.create_connection((host, port), timeout=1):
+                  pass
+          PY
+            then break; fi
+            sleep 2
+          done
+
+      - name: Deploy live Golden workload
+        working-directory: agentic-aiops
+        run: |
+          kubectl apply -f demo/k8s/golden-stack.yaml
+          kubectl -n golden-demo rollout status deploy/checkout-api --timeout=180s
+          kubectl -n golden-demo rollout status deploy/prometheus --timeout=180s
+          kubectl -n golden-demo scale deploy/load-generator --replicas=1
+          kubectl -n golden-demo rollout status deploy/load-generator --timeout=120s
+          sleep 10
+
+      - name: Expose live read endpoints
+        working-directory: agentic-aiops
+        run: |
+          kubectl -n golden-demo port-forward svc/prometheus 19090:9090 >/tmp/prometheus-pf.log 2>&1 &
+          kubectl proxy --port=18001 >/tmp/kube-proxy.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:19090/-/ready >/dev/null &&             curl -fsS http://127.0.0.1:18001/api/v1/namespaces/golden-demo/pods >/dev/null && break
+            sleep 1
+          done
+
+      - name: Run four-repo acceptance
+        working-directory: agentic-aiops
+        env:
+          TEMPORAL_ADDRESS: 127.0.0.1:7233
+          TEMPORAL_TASK_QUEUE: agent-runs
+          PROMETHEUS_URL: http://127.0.0.1:19090
+          KUBERNETES_API: http://127.0.0.1:18001
+          DECISION_GATEWAY_URL: http://127.0.0.1:8080
+          AGENT_RELEASE_NAME: checkout-sre-golden-v1
+        run: |
+          bash scripts/run-acceptance.sh | tee /tmp/four-repo-acceptance.txt
+
+      - name: Prove mutation blocks promotion
+        working-directory: agentic-aiops
+        run: |
+          RUN_DIR=.golden-runs/golden-checkout-acceptance-001
+          cp "$RUN_DIR/release-evidence.json" "$RUN_DIR/release-evidence-mutated.json"
+          python - <<'PY'
+          import json
+          p='.golden-runs/golden-checkout-acceptance-001/release-evidence-mutated.json'
+          d=json.load(open(p))
+          d['remediation_status']='ROLLED_BACK'
+          json.dump(d, open(p,'w'), indent=2)
+          PY
+          if docker run --rm             -v "$PWD/demo/control-plane:/workspace:ro"             -v "$PWD/$RUN_DIR:/run:ro"             agent-control-plane:acceptance             gate /workspace/golden-eval-gate.yaml             --metrics /run/acceptance-metrics.json             --evidence /run/release-evidence-mutated.json             >/tmp/mutation-gate.txt 2>&1; then
+            echo "mutated evidence unexpectedly passed"
+            cat /tmp/mutation-gate.txt
+            exit 1
+          fi
+          cat /tmp/mutation-gate.txt
+
+      - name: Capture final Kubernetes state
+        if: always()
+        working-directory: agentic-aiops
+        run: |
+          kubectl -n golden-demo get deploy checkout-api -o json > /tmp/checkout-final.json || true
+          kubectl -n golden-demo get pods -o wide > /tmp/pods-final.txt || true
+          docker compose -f compose.golden.yml ps > /tmp/compose-final.txt || true
+
+      - name: Upload acceptance proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-repo-acceptance-proof
+          path: |
+            agentic-aiops/.golden-runs/
+            /tmp/four-repo-acceptance.txt
+            /tmp/mutation-gate.txt
+            /tmp/checkout-final.json
+            /tmp/pods-final.txt
+            /tmp/compose-final.txt
+            /tmp/prometheus-pf.log
+            /tmp/kube-proxy.log
