@@ -174,6 +174,29 @@ class GoldenIncidentRunner:
         else:
             bundle, action = frozen
             bundle_sha256 = bundle.sha256()
+            frozen_release = bundle.metadata.get("release_ref")
+            frozen_run = bundle.metadata.get("runtime_run_id")
+            if context.release_ref and frozen_release != context.release_ref:
+                raise RuntimeError(
+                    "frozen evidence release_ref does not match durable run context"
+                )
+            if frozen_run and frozen_run != context.runtime_run_id:
+                raise RuntimeError(
+                    "frozen evidence runtime_run_id does not match durable run context"
+                )
+            ledger_attrs = dict(action.ledger.attributes)
+            if frozen_release and ledger_attrs.get("release_ref") != frozen_release:
+                raise RuntimeError(
+                    "decision ledger release_ref does not match frozen evidence"
+                )
+            if frozen_run and ledger_attrs.get("runtime_run_id") != frozen_run:
+                raise RuntimeError(
+                    "decision ledger runtime_run_id does not match frozen evidence"
+                )
+            if ledger_attrs.get("evidence_digest") != bundle_sha256:
+                raise RuntimeError(
+                    "decision ledger evidence_digest does not match frozen evidence"
+                )
 
         bundle_ref = context.bundle_ref(bundle_sha256)
         state = runtime.status(run)
