@@ -13,7 +13,7 @@ from .bundle import EvidenceBundle
 from .models import Incident
 from .policy import ActionDecision
 from .ledger import DecisionLedgerEntry
-from .remediation import RemediationResult, SafeRemediationRunner
+from .remediation import ExecutionResult, RemediationResult, RollbackResult, SafeRemediationRunner, VerificationResult
 from .runner import InvestigationRunner
 from .release_acceptance import write_control_plane_acceptance
 from .action_receipt import action_key, load_receipt, store_receipt
@@ -279,25 +279,65 @@ class GoldenIncidentRunner:
             store_operation(context.run_dir, operation)
         if result is None:
             try:
-                result = self.remediation.run(
-                    action,
-                    approval_granted=approved,
-                )
-                operation = transition_operation(
-                    context.run_dir,
-                    operation,
-                    "APPLIED",
-                    evidence_refs=tuple(
-                        result.execution.evidence_ids
-                        if result.execution is not None else ()
-                    ),
-                )
+                if operation.phase in {"VERIFIED", "ROLLED_BACK"}:
+                    if not operation.result:
+                        raise RuntimeError(
+                            f"terminal operation {operation.operation_id} is missing its durable result"
+                        )
+                    data = operation.result
+                    result = RemediationResult(
+                        status=str(data["status"]),
+                        execution=ExecutionResult(**data["execution"]) if data.get("execution") else None,
+                        verification=VerificationResult(**data["verification"]) if data.get("verification") else None,
+                        rollback=RollbackResult(**data["rollback"]) if data.get("rollback") else None,
+                        evidence_ids=tuple(data.get("evidence_ids", ())),
+                    )
+                elif operation.phase in {
+                    "EXECUTION_FAILED",
+                    "VERIFICATION_FAILED",
+                    "ROLLBACK_FAILED",
+                    "RECOVERY_REQUIRED",
+                }:
+                    raise RuntimeError(
+                        f"operation {operation.operation_id} is {operation.phase} and requires explicit recovery"
+                    )
+                elif operation.phase == "APPLIED":
+                    if not operation.execution:
+                        raise RuntimeError(
+                            f"applied operation {operation.operation_id} is missing its durable execution checkpoint"
+                        )
+                    execution_data = operation.execution
+                    execution = ExecutionResult(
+                        changed=bool(execution_data["changed"]),
+                        resource_ref=str(execution_data["resource_ref"]),
+                        evidence_ids=tuple(execution_data.get("evidence_ids", ())),
+                    )
+                    result = self.remediation.resume_verification(action, execution)
+                elif operation.phase == "PREPARED":
+                    def mark_applied(execution) -> None:
+                        nonlocal operation
+                        operation = transition_operation(
+                            context.run_dir,
+                            operation,
+                            "APPLIED",
+                            evidence_refs=tuple(execution.evidence_ids),
+                            execution=asdict(execution),
+                        )
+
+                    result = self.remediation.run(
+                        action,
+                        approval_granted=approved,
+                        on_applied=mark_applied,
+                    )
+
+                terminal_result = asdict(result)
                 if result.status == "VERIFIED":
                     operation = transition_operation(
                         context.run_dir,
                         operation,
                         "VERIFIED",
                         evidence_refs=result.evidence_ids,
+                        result=terminal_result,
                     )
                 elif result.status == "ROLLED_BACK":
                     operation = transition_operation(
@@ -305,23 +345,53 @@ class GoldenIncidentRunner:
                         operation,
                         "ROLLED_BACK",
                         evidence_refs=result.evidence_ids,
+                        result=terminal_result,
+                    )
+                elif result.status == "VERIFICATION_FAILED":
+                    operation = transition_operation(
+                        context.run_dir,
+                        operation,
+                        "VERIFICATION_FAILED",
+                        evidence_refs=result.evidence_ids,
+                        result=terminal_result,
+                        error=result.status,
                     )
                 else:
                     operation = transition_operation(
                         context.run_dir,
                         operation,
-                        "FAILED",
+                        "RECOVERY_REQUIRED",
                         evidence_refs=result.evidence_ids,
+                        result=terminal_result,
                         error=result.status,
                     )
                 store_receipt(context.run_dir, key, result)
             except Exception as exc:
-                transition_operation(
-                    context.run_dir,
-                    operation,
-                    "FAILED",
-                    error=f"{type(exc).__name__}: {exc}",
-                )
+                if operation.phase == "APPLIED":
+                    # The side effect is durably checkpointed. A verifier/network
+                    # exception is not evidence that the operation failed; keep
+                    # APPLIED so the next attempt resumes verification without
+                    # executing the mutation again.
+                    transition_operation(
+                        context.run_dir,
+                        operation,
+                        "APPLIED",
+                        error=f"{type(exc).__name__}: {exc}",
+                        increment_attempt=True,
+                    )
+                else:
+                    failure_phase = (
+                        "EXECUTION_FAILED"
+                        if operation.phase == "PREPARED"
+                        else "RECOVERY_REQUIRED"
+                    )
+                    transition_operation(
+                        context.run_dir,
+                        operation,
+                        failure_phase,
+                        error=f"{type(exc).__name__}: {exc}",
+                        increment_attempt=True,
+                    )
                 raise
         post_action = {
             "status": result.status,
@@ -360,6 +430,9 @@ class GoldenIncidentRunner:
                 bundle_sha256=bundle_sha256,
                 remediation_status=result.status,
                 post_action_ref=post_action_ref,
+                operation_id=operation.operation_id,
+                operation_phase=operation.phase,
+                operation_evidence_refs=operation.evidence_refs,
             )
 
         runtime.complete(

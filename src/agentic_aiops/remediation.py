@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Callable, Protocol, Sequence
 
 from .action_orchestrator import OrchestratedAction, ProposedAction
 
@@ -71,11 +71,37 @@ class SafeRemediationRunner:
         self.executor = executor
         self.verifier = verifier
 
+    def resume_verification(
+        self,
+        orchestrated: OrchestratedAction,
+        execution: ExecutionResult,
+    ) -> RemediationResult:
+        """Resume after an already-applied side effect without executing it again."""
+        verification = self.verifier.verify(orchestrated.proposal, execution)
+        all_evidence = list(orchestrated.proposal.evidence_ids)
+        all_evidence.extend(execution.evidence_ids)
+        all_evidence.extend(verification.evidence_ids)
+        if verification.passed:
+            return RemediationResult(
+                "VERIFIED", execution, verification, None,
+                tuple(dict.fromkeys(all_evidence)),
+            )
+        rollback = None
+        if orchestrated.proposal.rollback_available and execution.changed:
+            rollback = self.executor.rollback(orchestrated.proposal, execution)
+            all_evidence.extend(rollback.evidence_ids)
+        return RemediationResult(
+            "ROLLED_BACK" if rollback is not None and rollback.rolled_back else "VERIFICATION_FAILED",
+            execution, verification, rollback,
+            tuple(dict.fromkeys(all_evidence)),
+        )
+
     def run(
         self,
         orchestrated: OrchestratedAction,
         *,
         approval_granted: bool = False,
+        on_applied: Callable[[ExecutionResult], None] | None = None,
     ) -> RemediationResult:
         if orchestrated.selected_path != "execute":
             return RemediationResult(
@@ -104,6 +130,8 @@ class SafeRemediationRunner:
         execution = self.executor.execute(
             orchestrated.proposal
         )
+        if on_applied is not None:
+            on_applied(execution)
         verification = self.verifier.verify(
             orchestrated.proposal,
             execution,

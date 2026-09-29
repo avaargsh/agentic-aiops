@@ -18,6 +18,9 @@ def build_release_evidence(
     bundle_sha256: str,
     remediation_status: str,
     post_action_ref: str,
+    operation_id: str | None = None,
+    operation_phase: str | None = None,
+    operation_evidence_refs: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     payload = {
         "release_ref": release_ref,
@@ -25,6 +28,9 @@ def build_release_evidence(
         "bundle_sha256": bundle_sha256,
         "remediation_status": remediation_status,
         "post_action_ref": post_action_ref,
+        "operation_id": operation_id,
+        "operation_phase": operation_phase,
+        "operation_evidence_refs": list(operation_evidence_refs),
     }
     return {**payload, "replay_digest": _digest(payload)}
 
@@ -45,6 +51,9 @@ def write_control_plane_acceptance(
     bundle_sha256: str,
     remediation_status: str,
     post_action_ref: str,
+    operation_id: str | None = None,
+    operation_phase: str | None = None,
+    operation_evidence_refs: tuple[str, ...] = (),
 ) -> tuple[Path, Path]:
     evidence = build_release_evidence(
         release_ref=release_ref,
@@ -52,6 +61,9 @@ def write_control_plane_acceptance(
         bundle_sha256=bundle_sha256,
         remediation_status=remediation_status,
         post_action_ref=post_action_ref,
+        operation_id=operation_id,
+        operation_phase=operation_phase,
+        operation_evidence_refs=operation_evidence_refs,
     )
     metrics = build_acceptance_metrics(remediation_status=remediation_status)
     evidence_path = run_dir / "release-evidence.json"
