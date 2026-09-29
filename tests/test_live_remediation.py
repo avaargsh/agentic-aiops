@@ -8,6 +8,8 @@ class FakeKubectl(KubectlScaleExecutor):
 
     def _run(self, *args):
         self.calls.append(args)
+        if "jsonpath={.spec.replicas}" in args:
+            return "2"
         return "4" if "jsonpath={.status.readyReplicas}" in args else "ok"
 
 
@@ -82,3 +84,23 @@ def test_prometheus_verifier_waits_for_first_post_action_sample():
     assert result.passed
     assert client.calls == 3
     assert result.evidence_ids[-1].endswith("/value/0.18")
+
+
+class AlreadyDesiredKubectl(FakeKubectl):
+    def _run(self, *args):
+        self.calls.append(args)
+        if "jsonpath={.spec.replicas}" in args:
+            return "4"
+        return "4" if "jsonpath={.status.readyReplicas}" in args else "ok"
+
+
+def test_kubectl_executor_reconciles_after_write_success_receipt_loss():
+    executor = AlreadyDesiredKubectl()
+
+    result = executor.execute(action())
+
+    assert not result.changed
+    assert not any("--replicas=4" in call for call in executor.calls)
+    assert any("rollout" in call and "status" in call for call in executor.calls)
+    assert result.evidence_ids[0].endswith("desired-replicas/4")
+    assert result.evidence_ids[-1].endswith("ready-replicas/4")
