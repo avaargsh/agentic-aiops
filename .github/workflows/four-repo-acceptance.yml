@@ -1,4 +1,5 @@
 name: four-repo-acceptance
+# M1 live acceptance trigger: 2026-09-29
 
 on:
   workflow_dispatch:
