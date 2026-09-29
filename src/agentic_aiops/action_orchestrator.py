@@ -62,6 +62,8 @@ class ActionOrchestrator:
     def decide(
         self,
         proposal: ProposedAction,
+        *,
+        evidence_digest: str | None = None,
     ) -> OrchestratedAction:
         response = self.decision_client.decide(
             decision_type="escalation",
