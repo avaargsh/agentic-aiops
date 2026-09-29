@@ -104,3 +104,44 @@ def test_kubectl_executor_reconciles_after_write_success_receipt_loss():
     assert any("rollout" in call and "status" in call for call in executor.calls)
     assert result.evidence_ids[0].endswith("desired-replicas/4")
     assert result.evidence_ids[-1].endswith("ready-replicas/4")
+
+
+def test_remediation_exposes_applied_checkpoint_before_verification():
+    from agentic_aiops.action_orchestrator import OrchestratedAction
+    from agentic_aiops.ledger import DecisionLedgerEntry
+    from agentic_aiops.policy import ActionDecision
+    from agentic_aiops.remediation import SafeRemediationRunner
+
+    order = []
+
+    class Verifier:
+        def verify(self, proposal, execution):
+            order.append("verify")
+            from agentic_aiops.remediation import VerificationResult
+            return VerificationResult(True, ("verify://ok",), "ok")
+
+    proposal = action()
+    orchestrated = OrchestratedAction(
+        proposal=proposal,
+        selected_path="execute",
+        model_confidence=1.0,
+        decision_id="decision-001",
+        policy=ActionDecision(True, False, "allowed"),
+        execution_allowed=True,
+        approval_required=False,
+        ledger=DecisionLedgerEntry(
+            decision_type="remediation",
+            selected_action="execute",
+            policy_reason="allowed",
+            evidence_ids=(),
+        ),
+    )
+    runner = SafeRemediationRunner(executor=FakeKubectl(), verifier=Verifier())
+
+    result = runner.run(
+        orchestrated,
+        on_applied=lambda execution: order.append("applied"),
+    )
+
+    assert result.status == "VERIFIED"
+    assert order == ["applied", "verify"]
