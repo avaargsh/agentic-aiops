@@ -16,6 +16,8 @@ def action_key(*, runtime_run_id: str, action: OrchestratedAction) -> str:
         "action_kind": action.proposal.action_kind,
         "target": action.proposal.target,
         "evidence_digest": action.ledger.attributes.get("evidence_digest", ""),
+        "authority_digest": action.ledger.attributes.get("authority_digest", ""),
+        "approval_id": action.ledger.attributes.get("approval_id", ""),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()

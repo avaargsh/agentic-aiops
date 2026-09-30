@@ -29,6 +29,11 @@ def verify_replay_provenance(
     checks = (
         (release_ref, attrs.get("release_ref"), "release_ref mismatch"),
         (runtime_run_id, attrs.get("runtime_run_id"), "runtime_run_id mismatch"),
+        (
+            bundle.metadata.get("authority_digest"),
+            attrs.get("authority_digest"),
+            "authority_digest mismatch",
+        ),
         (digest, attrs.get("evidence_digest"), "evidence_digest mismatch"),
     )
     for expected, actual, reason in checks:

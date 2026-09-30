@@ -141,6 +141,8 @@ class GoldenIncidentRunner:
             if context.release_ref:
                 bundle.metadata["release_ref"] = context.release_ref
                 bundle.metadata["runtime_run_id"] = context.runtime_run_id
+            if context.authority_digest:
+                bundle.metadata["authority_digest"] = context.authority_digest
             bundle_sha256 = bundle.sha256()
             bundle.metadata["bundle_sha256"] = bundle_sha256
             proposal = self.proposal_fn(bundle)
@@ -148,7 +150,15 @@ class GoldenIncidentRunner:
                 proposal,
                 evidence_digest=bundle_sha256,
             )
-            if context.release_ref:
+            if context.release_ref or context.authority_digest:
+                authority_attributes = {
+                    **dict(action.ledger.attributes),
+                    "runtime_run_id": context.runtime_run_id,
+                }
+                if context.release_ref:
+                    authority_attributes["release_ref"] = context.release_ref
+                if context.authority_digest:
+                    authority_attributes["authority_digest"] = context.authority_digest
                 action = OrchestratedAction(
                     proposal=action.proposal,
                     selected_path=action.selected_path,
@@ -165,11 +175,7 @@ class GoldenIncidentRunner:
                         confidence=action.ledger.confidence,
                         requires_approval=action.ledger.requires_approval,
                         outcome=action.ledger.outcome,
-                        attributes={
-                            **dict(action.ledger.attributes),
-                            "release_ref": context.release_ref,
-                            "runtime_run_id": context.runtime_run_id,
-                        },
+                        attributes=authority_attributes,
                     ),
                 )
             if action.approval_required:
@@ -205,6 +211,7 @@ class GoldenIncidentRunner:
             bundle_sha256 = bundle.sha256()
             frozen_release = bundle.metadata.get("release_ref")
             frozen_run = bundle.metadata.get("runtime_run_id")
+            frozen_authority = bundle.metadata.get("authority_digest")
             if context.release_ref and frozen_release != context.release_ref:
                 raise RuntimeError(
                     "frozen evidence release_ref does not match durable run context"
@@ -212,6 +219,10 @@ class GoldenIncidentRunner:
             if frozen_run and frozen_run != context.runtime_run_id:
                 raise RuntimeError(
                     "frozen evidence runtime_run_id does not match durable run context"
+                )
+            if context.authority_digest and frozen_authority != context.authority_digest:
+                raise RuntimeError(
+                    "frozen evidence authority_digest does not match durable run context"
                 )
             ledger_attrs = dict(action.ledger.attributes)
             if frozen_release and ledger_attrs.get("release_ref") != frozen_release:
@@ -221,6 +232,10 @@ class GoldenIncidentRunner:
             if frozen_run and ledger_attrs.get("runtime_run_id") != frozen_run:
                 raise RuntimeError(
                     "decision ledger runtime_run_id does not match frozen evidence"
+                )
+            if frozen_authority and ledger_attrs.get("authority_digest") != frozen_authority:
+                raise RuntimeError(
+                    "decision ledger authority_digest does not match frozen evidence"
                 )
             if ledger_attrs.get("evidence_digest") != bundle_sha256:
                 raise RuntimeError(
@@ -275,6 +290,14 @@ class GoldenIncidentRunner:
                 target=action.proposal.target,
                 evidence_digest=str(action.ledger.attributes.get("evidence_digest", "")),
                 desired_state={"replicas": 4} if action.proposal.action_kind == "scale" else {},
+                approval_id=(
+                    str(action.ledger.attributes.get("approval_id") or "")
+                    or None
+                ),
+                authority_digest=(
+                    str(action.ledger.attributes.get("authority_digest") or "")
+                    or None
+                ),
             )
             store_operation(context.run_dir, operation)
         if result is None:
@@ -433,6 +456,8 @@ class GoldenIncidentRunner:
                 operation_id=operation.operation_id,
                 operation_phase=operation.phase,
                 operation_evidence_refs=operation.evidence_refs,
+                operation_approval_id=operation.approval_id,
+                authority_digest=operation.authority_digest,
             )
 
         runtime.complete(
@@ -444,6 +469,7 @@ class GoldenIncidentRunner:
                 "remediation_status": result.status,
                 "release_ref": context.release_ref,
                 "runtime_run_id": context.runtime_run_id,
+                "authority_digest": context.authority_digest,
             },
             evidence_refs=(
                 bundle_ref,

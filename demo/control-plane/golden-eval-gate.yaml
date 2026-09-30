@@ -12,4 +12,7 @@ spec:
       op: eq
       value: 0.0
   evidenceRequired: true
+  requiredProvenance:
+    - operation
+    - authority
   onFailure: block

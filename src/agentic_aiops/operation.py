@@ -36,6 +36,8 @@ class OperationRecord:
     target: str
     evidence_digest: str
     desired_state: dict[str, object]
+    approval_id: str | None = None
+    authority_digest: str | None = None
     evidence_refs: tuple[str, ...] = ()
     execution: dict[str, object] | None = None
     result: dict[str, object] | None = None
@@ -94,6 +96,8 @@ def transition_operation(
         target=record.target,
         evidence_digest=record.evidence_digest,
         desired_state=dict(record.desired_state),
+        approval_id=record.approval_id,
+        authority_digest=record.authority_digest,
         evidence_refs=record.evidence_refs if evidence_refs is None else evidence_refs,
         execution=record.execution if execution is None else dict(execution),
         result=record.result if result is None else dict(result),

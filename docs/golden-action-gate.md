@@ -3,8 +3,13 @@
 The first cross-repository runtime contract is now explicit.
 
 ```text
+AgentAuthorityEnvelope
+      |
+      | deployment admission freezes authorityDigest
+      v
 AIOps Evidence
       |
+      | authorityDigest participates in evidence digest
       v
 ProposedAction
       |
@@ -40,7 +45,11 @@ For a write action:
 3. an approval request is created,
 4. evidence IDs are converted to durable evidence references,
 5. the runtime owns approval state,
-6. a durable workflow can wait and resume.
+6. a durable workflow can wait and resume,
+7. the resulting OperationRecord freezes the exact approval ID, evidence digest and deployment authority digest,
+8. release evidence carries the same authority digest back to the control plane.
+
+An approval is therefore not a reusable permission. It authorizes one frozen action under one admitted deployment authority envelope.
 
 ## Repository coupling
 
