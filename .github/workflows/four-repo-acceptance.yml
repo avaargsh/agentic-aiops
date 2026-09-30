@@ -2,6 +2,8 @@ name: four-repo-acceptance
 # M1 live acceptance verification: 2026-09-30
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   pull_request:
     paths:
@@ -39,7 +41,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
-          ref: fix/package-schema-resources
+          ref: 7fbedfbe0ca140590613a09d09b87c21c592b3eb
           token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
           path: agent-control-plane
 
@@ -47,12 +49,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: avaargsh/cloud-agent-runtime
+          ref: eb39ca012a4fe4f77ba03e28df6ca871c8a751ab
           path: cloud-agent-runtime
 
       - name: Checkout Decision Lab
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-decision-lab
+          ref: 899dcb4e127bbbfb4da5de519b9e3a7c43092779
           path: agent-decision-lab
 
       - uses: actions/setup-python@v5
@@ -67,9 +71,30 @@ jobs:
         working-directory: agentic-aiops
         run: |
           pip install -e '../cloud-agent-runtime[temporal]'
-          pip install -e '../agent-control-plane'
+          pip install -e '../agent-control-plane[dev]'
           pip install -e '.[dev,temporal]'
           curl -fsSL https://github.com/temporalio/cli/releases/download/v1.9.1/temporal_cli_1.9.1_linux_amd64.tar.gz | tar -xz -C /usr/local/bin temporal
+
+      - name: Verify Control Plane contracts and tests
+        working-directory: agent-control-plane
+        run: |
+          pytest -q
+          for schema in schemas/*.schema.json; do
+            python -m json.tool "$schema" >/dev/null
+          done
+          agent-control-plane validate examples/vertical-slice.yaml
+          agent-control-plane validate examples/manifests.yaml
+
+      - name: Record tested repository revisions
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          names = ['agentic-aiops', 'agent-control-plane', 'cloud-agent-runtime', 'agent-decision-lab']
+          revisions = {name: subprocess.check_output(['git', '-C', name, 'rev-parse', 'HEAD'], text=True).strip() for name in names}
+          with open('/tmp/four-repo-revisions.json', 'w') as out:
+              json.dump(revisions, out, indent=2)
+          print(json.dumps(revisions, indent=2))
+          PY
 
       - name: Build acceptance services
         working-directory: agentic-aiops
@@ -135,12 +160,19 @@ jobs:
           d['remediation_status']='ROLLED_BACK'
           json.dump(d, open(p,'w'), indent=2)
           PY
-          if docker run --rm             -v "$PWD/demo/control-plane:/workspace:ro"             -v "$PWD/$RUN_DIR:/run:ro"             agent-control-plane:acceptance             gate /workspace/golden-eval-gate.yaml             --metrics /run/acceptance-metrics.json             --evidence /run/release-evidence-mutated.json             >/tmp/mutation-gate.txt 2>&1; then
+          AUTHORITY_DIGEST="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["proposed_digest"])' "$RUN_DIR/authority-admission.json")"
+          if docker run --rm             -v "$PWD/demo/control-plane:/workspace:ro"             -v "$PWD/$RUN_DIR:/run:ro"             agent-control-plane:acceptance             gate /workspace/golden-eval-gate.yaml             --metrics /run/acceptance-metrics.json             --evidence /run/release-evidence-mutated.json             --authority-digest "$AUTHORITY_DIGEST"             >/tmp/mutation-gate.txt 2>&1; then
             echo "mutated evidence unexpectedly passed"
             cat /tmp/mutation-gate.txt
             exit 1
           fi
           cat /tmp/mutation-gate.txt
+          python - <<'PY'
+          import json
+          result = json.load(open('/tmp/mutation-gate.txt'))
+          assert result['decision'] == 'BLOCK', result
+          assert result['reason'] == 'INVALID_RELEASE_EVIDENCE', result
+          PY
 
       - name: Capture final Kubernetes state
         if: always()
@@ -160,6 +192,7 @@ jobs:
             agentic-aiops/.golden-runs/
             /tmp/four-repo-acceptance.txt
             /tmp/mutation-gate.txt
+            /tmp/four-repo-revisions.json
             /tmp/checkout-final.json
             /tmp/pods-final.txt
             /tmp/compose-final.txt
