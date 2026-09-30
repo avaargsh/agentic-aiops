@@ -17,7 +17,7 @@ on:
 
 jobs:
   live-acceptance:
-    if: ${{ secrets.GOLDEN_STACK_REPO_TOKEN != '' }}
+    if: ${{ secrets.AGENT_STACK_GITHUB_TOKEN != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -30,21 +30,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
-          token: ${{ secrets.GOLDEN_STACK_REPO_TOKEN }}
+          token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
           path: agent-control-plane
 
       - name: Checkout Cloud Agent Runtime
         uses: actions/checkout@v4
         with:
           repository: avaargsh/cloud-agent-runtime
-          token: ${{ secrets.GOLDEN_STACK_REPO_TOKEN }}
+          token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
           path: cloud-agent-runtime
 
       - name: Checkout Decision Lab
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-decision-lab
-          token: ${{ secrets.GOLDEN_STACK_REPO_TOKEN }}
+          token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
           path: agent-decision-lab
 
       - uses: actions/setup-python@v5
