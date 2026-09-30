@@ -40,7 +40,13 @@ def main():
         release_ref=os.environ.get("AGENT_RELEASE_NAME"),
         authority_digest=os.environ.get("AGENT_AUTHORITY_DIGEST"),
     )
-    run = runtime.start_or_attach(runtime_run_id=args.run_id, session_id=args.session_id)
+    if args.command == "start":
+        run = runtime.start_or_attach(
+            runtime_run_id=args.run_id,
+            session_id=args.session_id,
+        )
+    else:
+        run = runtime.reference(runtime_run_id=args.run_id)
     if args.command == "status":
         status = runtime.status(run)
         decision_path = context.run_dir / "decision.json"
