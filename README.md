@@ -136,6 +136,16 @@ pytest -q
 
 For cross-repository integration, [four-repo-acceptance](.github/workflows/four-repo-acceptance.yml) verifies pinned public Control Plane, Runtime and Decision commits from this repository's main push CI on disposable kind + Temporal infrastructure.
 
+The dependency revisions are owned by the machine-readable [stack.lock.json](stack.lock.json), not duplicated inside workflow YAML. Validate the lock locally with:
+
+```bash
+make stack-lock-check
+# or, after installation
+agent-stack-lock stack.lock.json
+```
+
+A stack change is therefore an explicit reviewable dependency update. CI fails closed if a required repository is renamed, a revision is not a full commit SHA, or the positive/negative release-gate contract is changed accidentally.
+
 ## Contributing and license
 
 Contributions are welcome through focused issues and pull requests. See `CONTRIBUTING.md`, `SECURITY.md`, and `CODE_OF_CONDUCT.md`.
