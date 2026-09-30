@@ -9,7 +9,7 @@
     },
     "runtime": {
       "repository": "avaargsh/cloud-agent-runtime",
-      "revision": "8dafeb1e8ec5f91e9b2ee7d787903f9ff0b0d401",
+      "revision": "020eb6c1c638ce17423995d340e26fcfcd242a66",
       "role": "durable Run-to-Workflow-to-Sandbox lifecycle binding and evidence archive"
     },
     "decision": {
