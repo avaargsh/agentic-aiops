@@ -17,6 +17,9 @@ on:
       - "src/agentic_aiops/golden_incident.py"
       - "src/agentic_aiops/release_acceptance.py"
       - ".github/workflows/four-repo-acceptance.yml"
+      - "stack.lock.json"
+      - "src/agentic_aiops/stack_lock.py"
+      - "tests/test_stack_lock.py"
 
 permissions:
   contents: read
@@ -26,7 +29,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve-stack:
+    runs-on: ubuntu-latest
+    outputs:
+      control_plane_ref: ${{ steps.lock.outputs.control_plane_ref }}
+      runtime_ref: ${{ steps.lock.outputs.runtime_ref }}
+      decision_ref: ${{ steps.lock.outputs.decision_ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: lock
+        name: Validate and resolve stack lock
+        run: PYTHONPATH=src python -m agentic_aiops.stack_lock stack.lock.json --github-output "$GITHUB_OUTPUT"
+
   control-plane-contracts:
+    needs: resolve-stack
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -36,7 +55,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
-          ref: 8825b024c2f8cd98eb9e0aea8afae991edf2c303
+          ref: ${{ needs.resolve-stack.outputs.control_plane_ref }}
           path: agent-control-plane
       - uses: actions/setup-python@v5
         with:
@@ -62,7 +81,7 @@ jobs:
           /tmp/cp-installed/bin/agent-control-plane validate "$GITHUB_WORKSPACE/agent-control-plane/examples/manifests.yaml"
 
   live-acceptance:
-    needs: control-plane-contracts
+    needs: [resolve-stack, control-plane-contracts]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -75,21 +94,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
-          ref: 8825b024c2f8cd98eb9e0aea8afae991edf2c303
+          ref: ${{ needs.resolve-stack.outputs.control_plane_ref }}
           path: agent-control-plane
 
       - name: Checkout Cloud Agent Runtime
         uses: actions/checkout@v4
         with:
           repository: avaargsh/cloud-agent-runtime
-          ref: 8dafeb1e8ec5f91e9b2ee7d787903f9ff0b0d401
+          ref: ${{ needs.resolve-stack.outputs.runtime_ref }}
           path: cloud-agent-runtime
 
       - name: Checkout Decision Lab
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-decision-lab
-          ref: 07bc6324868304d3f847e4d91b2c4e4691b4c0a5
+          ref: ${{ needs.resolve-stack.outputs.decision_ref }}
           path: agent-decision-lab
 
       - uses: actions/setup-python@v5
