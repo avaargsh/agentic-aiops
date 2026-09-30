@@ -1,11 +1,14 @@
-.PHONY: acceptance-build acceptance acceptance-clean
+.PHONY: stack-lock-check acceptance-build acceptance acceptance-clean
 
-acceptance-build:
+stack-lock-check:
+	PYTHONPATH=src python -m agentic_aiops.stack_lock stack.lock.json
+
+acceptance-build: stack-lock-check
 	docker build -t agent-control-plane:acceptance ../agent-control-plane
 	docker build -t agent-decision-lab:acceptance ../agent-decision-lab
 	docker compose -f compose.golden.yml build runtime-worker
 
-acceptance:
+acceptance: stack-lock-check
 	bash scripts/run-acceptance.sh
 
 acceptance-clean:
