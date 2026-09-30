@@ -1,0 +1,32 @@
+{
+  "verifiedRevisions": {
+    "agentic-aiops": "438ed9f3ccbffaef2466c064e32306e4324f831b",
+    "agent-control-plane": "7d19efaca02bfcae248d49847fe52a6b45f775d4",
+    "cloud-agent-runtime": "06f90a019bde4d7a7434f051d23aaa43e62d6377",
+    "agent-decision-lab": "07bc6324868304d3f847e4d91b2c4e4691b4c0a5"
+  },
+  "event": "push",
+  "workflowUrl": "https://github.com/avaargsh/agentic-aiops/actions/runs/36685817087",
+  "positiveGate": {
+    "decision": "PROMOTE",
+    "passed": true,
+    "release_ref": "checkout-sre-golden-v1",
+    "runtime_run_id": "golden-checkout-acceptance-001",
+    "reason": "EVAL_GATE_PASSED",
+    "eval_result": {
+      "passed": true,
+      "violations": []
+    }
+  },
+  "mutatedEvidenceGate": {
+    "decision": "BLOCK",
+    "passed": false,
+    "release_ref": "checkout-sre-golden-v1",
+    "runtime_run_id": "golden-checkout-acceptance-001",
+    "reason": "INVALID_RELEASE_EVIDENCE",
+    "eval_result": {
+      "passed": false,
+      "violations": []
+    }
+  }
+}

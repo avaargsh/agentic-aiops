@@ -26,6 +26,8 @@ from masquerading as proof of evidence validation.
 
 The run's `four-repo-acceptance-proof` artifact has digest
 `sha256:d9575ecff88976f48f71f8445346ef344786ace995f92455f801a0ebe6e33077`.
+[Captured release-gate outputs](m1-public-mainline-proof.json) preserve the actual positive and mutated-evidence JSON results in git.
+
 GitHub artifacts follow the repository retention policy; the immutable revisions
 and workflow allow replay after artifact expiry.
 
