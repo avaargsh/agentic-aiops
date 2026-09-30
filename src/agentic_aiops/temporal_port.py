@@ -17,6 +17,9 @@ class AsyncTemporalPortAdapter:
     def start_or_attach(self, *, runtime_run_id: str, session_id: str) -> Any:
         return self.run_async(self.bridge.start_or_attach(runtime_run_id=runtime_run_id, session_id=session_id))
 
+    def reference(self, *, runtime_run_id: str) -> Any:
+        return self.bridge.reference(runtime_run_id=runtime_run_id)
+
     def pause(self, run: Any, *, evidence_refs: Sequence[str]) -> None:
         self.run_async(self.bridge.driver.signal(run, name="pause_run", payload={"evidence_refs": list(evidence_refs)}))
 
