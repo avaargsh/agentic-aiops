@@ -148,6 +148,7 @@ jobs:
           kubectl -n golden-demo get deploy checkout-api -o json > /tmp/checkout-final.json || true
           kubectl -n golden-demo get pods -o wide > /tmp/pods-final.txt || true
           docker compose -f compose.golden.yml ps > /tmp/compose-final.txt || true
+          docker compose -f compose.golden.yml logs runtime-worker > /tmp/runtime-worker.log 2>&1 || true
 
       - name: Upload acceptance proof
         if: always()
@@ -161,5 +162,6 @@ jobs:
             /tmp/checkout-final.json
             /tmp/pods-final.txt
             /tmp/compose-final.txt
+            /tmp/runtime-worker.log
             /tmp/prometheus-pf.log
             /tmp/kube-proxy.log
