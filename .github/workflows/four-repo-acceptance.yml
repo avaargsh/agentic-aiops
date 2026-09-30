@@ -1,6 +1,9 @@
 name: four-repo-acceptance
+# M1 live acceptance verification: 2026-09-30
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   pull_request:
     paths:
@@ -15,20 +18,54 @@ on:
       - "src/agentic_aiops/release_acceptance.py"
       - ".github/workflows/four-repo-acceptance.yml"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: four-repo-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  control-plane-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: avaargsh/agent-control-plane
+          ref: 35a5561558bcf5e4e1895e721e458f22c0809195
+          path: agent-control-plane
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Test contracts and schemas
+        working-directory: agent-control-plane
+        run: |
+          pip install -e '.[dev]'
+          pytest -q
+          for schema in schemas/*.schema.json; do
+            python -m json.tool "$schema" >/dev/null
+          done
+          agent-control-plane validate examples/vertical-slice.yaml
+          agent-control-plane validate examples/manifests.yaml
+      - name: Verify installed wheel resources
+        working-directory: agent-control-plane
+        run: |
+          pip wheel --no-deps --wheel-dir /tmp/cp-wheel .
+          python -m venv /tmp/cp-installed
+          /tmp/cp-installed/bin/pip install /tmp/cp-wheel/*.whl
+          cd /tmp
+          /tmp/cp-installed/bin/python -c "from agent_control_plane.validator import schema_directory; assert (schema_directory() / 'eval-gate.schema.json').is_file()"
+          /tmp/cp-installed/bin/agent-control-plane validate "$GITHUB_WORKSPACE/agent-control-plane/examples/manifests.yaml"
+
   live-acceptance:
+    needs: control-plane-contracts
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Validate private repository credential
-        env:
-          AGENT_STACK_GITHUB_TOKEN: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
-        run: |
-          if [ -z "$AGENT_STACK_GITHUB_TOKEN" ]; then
-            echo "::error::AGENT_STACK_GITHUB_TOKEN is required while agent-control-plane is private"
-            exit 2
-          fi
-
       - name: Checkout agentic-aiops
         uses: actions/checkout@v4
         with:
@@ -38,19 +75,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
-          token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
+          ref: 35a5561558bcf5e4e1895e721e458f22c0809195
           path: agent-control-plane
 
       - name: Checkout Cloud Agent Runtime
         uses: actions/checkout@v4
         with:
           repository: avaargsh/cloud-agent-runtime
+          ref: 5a893c2fefb2102f2a7c3c78a895a047879cce10
           path: cloud-agent-runtime
 
       - name: Checkout Decision Lab
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-decision-lab
+          ref: 07bc6324868304d3f847e4d91b2c4e4691b4c0a5
           path: agent-decision-lab
 
       - uses: actions/setup-python@v5
@@ -65,7 +104,20 @@ jobs:
         working-directory: agentic-aiops
         run: |
           pip install -e '../cloud-agent-runtime[temporal]'
+          pip install -e '../agent-control-plane[dev]'
           pip install -e '.[dev,temporal]'
+          curl -fsSL https://github.com/temporalio/cli/releases/download/v1.9.1/temporal_cli_1.9.1_linux_amd64.tar.gz | tar -xz -C /usr/local/bin temporal
+
+      - name: Record tested repository revisions
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          names = ['agentic-aiops', 'agent-control-plane', 'cloud-agent-runtime', 'agent-decision-lab']
+          revisions = {name: subprocess.check_output(['git', '-C', name, 'rev-parse', 'HEAD'], text=True).strip() for name in names}
+          with open('/tmp/four-repo-revisions.json', 'w') as out:
+              json.dump(revisions, out, indent=2)
+          print(json.dumps(revisions, indent=2))
+          PY
 
       - name: Build acceptance services
         working-directory: agentic-aiops
@@ -116,6 +168,7 @@ jobs:
           DECISION_GATEWAY_URL: http://127.0.0.1:8080
           AGENT_RELEASE_NAME: checkout-sre-golden-v1
         run: |
+          set -o pipefail
           bash scripts/run-acceptance.sh | tee /tmp/four-repo-acceptance.txt
 
       - name: Prove mutation blocks promotion
@@ -130,12 +183,19 @@ jobs:
           d['remediation_status']='ROLLED_BACK'
           json.dump(d, open(p,'w'), indent=2)
           PY
-          if docker run --rm             -v "$PWD/demo/control-plane:/workspace:ro"             -v "$PWD/$RUN_DIR:/run:ro"             agent-control-plane:acceptance             gate /workspace/golden-eval-gate.yaml             --metrics /run/acceptance-metrics.json             --evidence /run/release-evidence-mutated.json             >/tmp/mutation-gate.txt 2>&1; then
+          AUTHORITY_DIGEST="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["proposed_digest"])' "$RUN_DIR/authority-admission.json")"
+          if docker run --rm             -v "$PWD/demo/control-plane:/workspace:ro"             -v "$PWD/$RUN_DIR:/run:ro"             agent-control-plane:acceptance             gate /workspace/golden-eval-gate.yaml             --metrics /run/acceptance-metrics.json             --evidence /run/release-evidence-mutated.json             --authority-digest "$AUTHORITY_DIGEST"             >/tmp/mutation-gate.txt 2>&1; then
             echo "mutated evidence unexpectedly passed"
             cat /tmp/mutation-gate.txt
             exit 1
           fi
           cat /tmp/mutation-gate.txt
+          python - <<'PY'
+          import json
+          result = json.load(open('/tmp/mutation-gate.txt'))
+          assert result['decision'] == 'BLOCK', result
+          assert result['reason'] == 'INVALID_RELEASE_EVIDENCE', result
+          PY
 
       - name: Capture final Kubernetes state
         if: always()
@@ -144,6 +204,7 @@ jobs:
           kubectl -n golden-demo get deploy checkout-api -o json > /tmp/checkout-final.json || true
           kubectl -n golden-demo get pods -o wide > /tmp/pods-final.txt || true
           docker compose -f compose.golden.yml ps > /tmp/compose-final.txt || true
+          docker compose -f compose.golden.yml logs runtime-worker > /tmp/runtime-worker.log 2>&1 || true
 
       - name: Upload acceptance proof
         if: always()
@@ -154,8 +215,10 @@ jobs:
             agentic-aiops/.golden-runs/
             /tmp/four-repo-acceptance.txt
             /tmp/mutation-gate.txt
+            /tmp/four-repo-revisions.json
             /tmp/checkout-final.json
             /tmp/pods-final.txt
             /tmp/compose-final.txt
+            /tmp/runtime-worker.log
             /tmp/prometheus-pf.log
             /tmp/kube-proxy.log

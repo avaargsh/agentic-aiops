@@ -7,6 +7,7 @@ RELEASE=${AGENT_RELEASE_NAME:-checkout-sre-golden-v1}
 PROM=${PROMETHEUS_URL:-http://127.0.0.1:19090}
 KUBE=${KUBERNETES_API:-http://127.0.0.1:18001}
 DECISION=${DECISION_GATEWAY_URL:-http://127.0.0.1:8080}
+TEMPORAL=${TEMPORAL_ADDRESS:-127.0.0.1:7233}
 RUN_DIR=".golden-runs/${RUN_ID}"
 mkdir -p "$RUN_DIR"
 
@@ -38,6 +39,50 @@ wait_http "$PROM/-/ready"
 wait_http "$KUBE/version"
 wait_http "$DECISION/health" || wait_http "$DECISION/docs"
 
+wait_temporal() {
+  for _ in $(seq 1 60); do
+    if temporal operator cluster health --address "$TEMPORAL" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Temporal cluster not ready: $TEMPORAL" >&2
+  return 1
+}
+wait_temporal
+
+wait_runtime_worker() {
+  local stable=0
+  for _ in $(seq 1 60); do
+    if docker compose -f compose.golden.yml ps --status running --services | grep -qx runtime-worker; then
+      stable=$((stable + 1))
+      if [[ "$stable" -ge 3 ]]; then
+        return 0
+      fi
+    else
+      stable=0
+    fi
+    sleep 1
+  done
+  echo "runtime-worker is not stably running" >&2
+  docker compose -f compose.golden.yml ps runtime-worker >&2 || true
+  docker compose -f compose.golden.yml logs runtime-worker >&2 || true
+  return 1
+}
+wait_runtime_worker
+
+AUTHORITY_BASELINE="$RUN_DIR/authority-baseline.json"
+AUTHORITY_PROPOSED="$RUN_DIR/authority-proposed.json"
+cat >"$AUTHORITY_BASELINE" <<EOF
+{"apiVersion":"agentplane.io/v1alpha1","kind":"AgentAuthorityEnvelope","metadata":{"name":"checkout-sre-golden"},"spec":{"fleetRef":"sre-golden","teamRef":"team://sre-platform","agentRef":"checkout-sre-golden","releaseRef":"checkout-sre-golden-v0","runtimeRefs":["temporal://golden/checkout-sre","sandbox://golden/checkout-sre"],"grants":[{"effect":"read","capability":"kubernetes.read","resource":"kubernetes://golden-demo/checkout/*","verbs":["get","list"]},{"effect":"write","capability":"kubernetes.scale","resource":"kubernetes://golden-demo/checkout/deployment/checkout-api","verbs":["scale"]}],"constraints":{"approvalMode":"human-exact","evidenceRequired":true,"maxOperationsPerRun":1}}}
+EOF
+cat >"$AUTHORITY_PROPOSED" <<EOF
+{"apiVersion":"agentplane.io/v1alpha1","kind":"AgentAuthorityEnvelope","metadata":{"name":"checkout-sre-golden"},"spec":{"fleetRef":"sre-golden","teamRef":"team://sre-platform","agentRef":"checkout-sre-golden","releaseRef":"$RELEASE","runtimeRefs":["temporal://golden/checkout-sre","sandbox://golden/checkout-sre"],"grants":[{"effect":"read","capability":"kubernetes.read","resource":"kubernetes://golden-demo/checkout/*","verbs":["get","list"]},{"effect":"write","capability":"kubernetes.scale","resource":"kubernetes://golden-demo/checkout/deployment/checkout-api","verbs":["scale"]}],"constraints":{"approvalMode":"human-exact","evidenceRequired":true,"maxOperationsPerRun":1}}}
+EOF
+agent-control-plane authority-admit "$AUTHORITY_PROPOSED" --baseline "$AUTHORITY_BASELINE" | tee "$RUN_DIR/authority-admission.json"
+grep -q '"decision": "ADMIT"' "$RUN_DIR/authority-admission.json"
+export AGENT_AUTHORITY_DIGEST="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["proposed_digest"])' "$RUN_DIR/authority-admission.json")"
+
 echo "[1/5] start incident and freeze pre-action evidence"
 python examples/live_golden_incident.py start --run-id "$RUN_ID" --session-id "$SESSION_ID" --prometheus "$PROM" --kube-api "$KUBE" --decision "$DECISION"
 
@@ -54,7 +99,7 @@ test -f "$RUN_DIR/acceptance-metrics.json"
 test -f "$RUN_DIR/post-action-evidence.json"
 
 echo "[4/5] evaluate sealed runtime evidence in Agent Control Plane"
-docker run --rm   -v "$PWD/demo/control-plane:/workspace:ro"   -v "$PWD/$RUN_DIR:/run:ro"   agent-control-plane:acceptance   gate /workspace/golden-eval-gate.yaml   --metrics /run/acceptance-metrics.json   --evidence /run/release-evidence.json   | tee "$RUN_DIR/release-gate.json"
+docker run --rm   -v "$PWD/demo/control-plane:/workspace:ro"   -v "$PWD/$RUN_DIR:/run:ro"   agent-control-plane:acceptance   gate /workspace/golden-eval-gate.yaml   --metrics /run/acceptance-metrics.json   --evidence /run/release-evidence.json   --authority-digest "$AGENT_AUTHORITY_DIGEST" | tee "$RUN_DIR/release-gate.json"
 
 grep -q '"decision": "PROMOTE"' "$RUN_DIR/release-gate.json"
 
