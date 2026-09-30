@@ -66,7 +66,9 @@ jobs:
         working-directory: agentic-aiops
         run: |
           pip install -e '../cloud-agent-runtime[temporal]'
+          pip install -e '../agent-control-plane'
           pip install -e '.[dev,temporal]'
+          curl -fsSL https://github.com/temporalio/cli/releases/download/v1.9.1/temporal_cli_1.9.1_linux_amd64.tar.gz | tar -xz -C /usr/local/bin temporal
 
       - name: Build acceptance services
         working-directory: agentic-aiops
