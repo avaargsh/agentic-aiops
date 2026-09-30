@@ -45,6 +45,7 @@ services:
     build:
       context: ../cloud-agent-runtime
     command: ["cloud-agent-runtime-worker", "--target", "temporal:7233", "--task-queue", "agent-runs"]
+    restart: on-failure
     depends_on:
       - temporal
 
