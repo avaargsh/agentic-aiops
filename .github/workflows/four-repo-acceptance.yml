@@ -117,6 +117,7 @@ jobs:
           DECISION_GATEWAY_URL: http://127.0.0.1:8080
           AGENT_RELEASE_NAME: checkout-sre-golden-v1
         run: |
+          set -o pipefail
           bash scripts/run-acceptance.sh | tee /tmp/four-repo-acceptance.txt
 
       - name: Prove mutation blocks promotion
