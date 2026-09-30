@@ -18,6 +18,13 @@ on:
       - "src/agentic_aiops/release_acceptance.py"
       - ".github/workflows/four-repo-acceptance.yml"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: four-repo-acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   control-plane-contracts:
     runs-on: ubuntu-latest
@@ -29,8 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
-          ref: 660a519eb52cc94fd8e2da0c6e0b450c1f92729e
-          token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
+          ref: 35a5561558bcf5e4e1895e721e458f22c0809195
           path: agent-control-plane
       - uses: actions/setup-python@v5
         with:
@@ -60,15 +66,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Validate private repository credential
-        env:
-          AGENT_STACK_GITHUB_TOKEN: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
-        run: |
-          if [ -z "$AGENT_STACK_GITHUB_TOKEN" ]; then
-            echo "::error::AGENT_STACK_GITHUB_TOKEN is required while agent-control-plane is private"
-            exit 2
-          fi
-
       - name: Checkout agentic-aiops
         uses: actions/checkout@v4
         with:
@@ -78,8 +75,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
-          ref: 660a519eb52cc94fd8e2da0c6e0b450c1f92729e
-          token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
+          ref: 35a5561558bcf5e4e1895e721e458f22c0809195
           path: agent-control-plane
 
       - name: Checkout Cloud Agent Runtime
