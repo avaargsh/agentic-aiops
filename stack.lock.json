@@ -4,7 +4,7 @@
   "dependencies": {
     "control_plane": {
       "repository": "avaargsh/agent-control-plane",
-      "revision": "8825b024c2f8cd98eb9e0aea8afae991edf2c303",
+      "revision": "2d689b89b133dc538d1d75b14f0d2f55e496b783",
       "role": "release resolution, authority admission, evidence validation and promotion gate"
     },
     "runtime": {
@@ -14,7 +14,7 @@
     },
     "decision": {
       "repository": "avaargsh/agent-decision-lab",
-      "revision": "899dcb4e127bbbfb4da5de519b9e3a7c43092779",
+      "revision": "1f07109b59712733dd51aab2e83618e529d9d035",
       "role": "bounded synchronous decision gateway and benchmark contract"
     }
   },
