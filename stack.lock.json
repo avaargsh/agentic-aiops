@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "baseline": "m1-stack",
+  "dependencies": {
+    "control_plane": {
+      "repository": "avaargsh/agent-control-plane",
+      "revision": "8825b024c2f8cd98eb9e0aea8afae991edf2c303",
+      "role": "release resolution, authority admission, evidence validation and promotion gate"
+    },
+    "runtime": {
+      "repository": "avaargsh/cloud-agent-runtime",
+      "revision": "8dafeb1e8ec5f91e9b2ee7d787903f9ff0b0d401",
+      "role": "durable Run-to-Workflow-to-Sandbox lifecycle binding and evidence archive"
+    },
+    "decision": {
+      "repository": "avaargsh/agent-decision-lab",
+      "revision": "899dcb4e127bbbfb4da5de519b9e3a7c43092779",
+      "role": "bounded synchronous decision gateway and benchmark contract"
+    }
+  },
+  "acceptance": {
+    "owner": "agentic-aiops",
+    "workflow": ".github/workflows/four-repo-acceptance.yml",
+    "success_gate": "PROMOTE",
+    "negative_gate": "INVALID_RELEASE_EVIDENCE"
+  }
+}
