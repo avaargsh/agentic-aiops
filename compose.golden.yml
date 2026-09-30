@@ -2,8 +2,8 @@ services:
   postgresql:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: temporal
-      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: ${AGENT_STACK_TEMPORAL_DB_USER:-temporal}
+      POSTGRES_PASSWORD: ${AGENT_STACK_TEMPORAL_DB_PASSWORD:-temporal}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U temporal"]
       interval: 3s
@@ -18,8 +18,8 @@ services:
     environment:
       - DB=postgres12
       - DB_PORT=5432
-      - POSTGRES_USER=temporal
-      - POSTGRES_PWD=temporal
+      - POSTGRES_USER=${AGENT_STACK_TEMPORAL_DB_USER:-temporal}
+      - POSTGRES_PWD=${AGENT_STACK_TEMPORAL_DB_PASSWORD:-temporal}
       - POSTGRES_SEEDS=postgresql
     ports:
       - "7233:7233"
