@@ -51,6 +51,26 @@ wait_temporal() {
 }
 wait_temporal
 
+wait_runtime_worker() {
+  local stable=0
+  for _ in $(seq 1 60); do
+    if docker compose -f compose.golden.yml ps --status running --services | grep -qx runtime-worker; then
+      stable=$((stable + 1))
+      if [[ "$stable" -ge 3 ]]; then
+        return 0
+      fi
+    else
+      stable=0
+    fi
+    sleep 1
+  done
+  echo "runtime-worker is not stably running" >&2
+  docker compose -f compose.golden.yml ps runtime-worker >&2 || true
+  docker compose -f compose.golden.yml logs runtime-worker >&2 || true
+  return 1
+}
+wait_runtime_worker
+
 AUTHORITY_BASELINE="$RUN_DIR/authority-baseline.json"
 AUTHORITY_PROPOSED="$RUN_DIR/authority-proposed.json"
 cat >"$AUTHORITY_BASELINE" <<EOF
