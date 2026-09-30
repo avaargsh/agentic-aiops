@@ -1,48 +1,73 @@
-# M1 public mainline baseline
+# M1 public stack baseline
 
-Frozen software baseline verified on 2026-09-30. All four repositories are public
-and carry Apache-2.0 license metadata. Each checkout is pinned to a full commit SHA.
+Verified software baseline refreshed on 2026-09-30.
 
-| Repository | Verified revision |
-| --- | --- |
-| agentic-aiops | `438ed9f3ccbffaef2466c064e32306e4324f831b` |
-| agent-control-plane | `7d19efaca02bfcae248d49847fe52a6b45f775d4` |
-| cloud-agent-runtime | `06f90a019bde4d7a7434f051d23aaa43e62d6377` |
-| agent-decision-lab | `07bc6324868304d3f847e4d91b2c4e4691b4c0a5` |
+The machine-readable source of truth for external repository revisions is
+[`stack.lock.json`](../../stack.lock.json). This document is the human-readable
+acceptance record and must not become a second dependency lock.
+
+## Verified revisions
+
+| Component | Verified revision | Role |
+| --- | --- | --- |
+| agentic-aiops PR tree | `e4fdae34e09609f83be87308ba567f2b09734c50` | Golden workload and acceptance owner |
+| agentic-aiops main integration | `d25c485f68eb196b66e9023c52b989a7f292738a` | squash merge of the accepted Stack Lock change |
+| agent-control-plane | `2d689b89b133dc538d1d75b14f0d2f55e496b783` | release / authority / evidence / promotion gate |
+| cloud-agent-runtime | `020eb6c1c638ce17423995d340e26fcfcd242a66` | Run ↔ Workflow ↔ Sandbox lifecycle and evidence archive |
+| agent-decision-lab | `1f07109b59712733dd51aab2e83618e529d9d035` | bounded Decision Gateway and benchmark contract |
+
+The accepted PR tree and the main integration commit are recorded separately so
+the acceptance evidence remains tied to the exact workflow head that GitHub
+executed while the public mainline integration is also traceable.
 
 ## Acceptance evidence
 
-[Exact-head main push acceptance](https://github.com/avaargsh/agentic-aiops/actions/runs/36685817087)
-passed with Python 3.11 / 3.12 Control Plane contract jobs and a fresh live kind +
-Temporal acceptance job. Control Plane reports 151 passed, 1 skipped per matrix
-environment; isolated wheel installation and packaged-schema validation also pass.
+[Four-repo acceptance run 36691646559](https://github.com/avaargsh/agentic-aiops/actions/runs/36691646559)
+completed successfully.
 
-The live run records all four checked-out revisions in
-`four-repo-revisions.json`, completes the bounded incident/approval workflow,
-and obtains `PROMOTE` from the Control Plane release gate. Mutating release
-evidence while retaining the positive path's authority digest obtains
-`BLOCK` with `INVALID_RELEASE_EVIDENCE`. This prevents an authority mismatch
-from masquerading as proof of evidence validation.
+The run proved:
 
-The run's `four-repo-acceptance-proof` artifact has digest
-`sha256:d9575ecff88976f48f71f8445346ef344786ace995f92455f801a0ebe6e33077`.
-[Captured release-gate outputs](m1-public-mainline-proof.json) preserve the actual positive and mutated-evidence JSON results in git.
+1. `stack.lock.json` validated and resolved the three external repository SHAs;
+2. Control Plane contracts, schemas and installed-wheel resources passed on
+   Python 3.11 and 3.12;
+3. a disposable kind cluster and Temporal-backed Golden Incident completed the
+   bounded remediation path;
+4. the release gate returned `PROMOTE` for the sealed positive path;
+5. mutated release evidence was rejected with
+   `BLOCK / INVALID_RELEASE_EVIDENCE`.
 
-GitHub artifacts follow the repository retention policy; the immutable revisions
-and workflow allow replay after artifact expiry.
+The uploaded `four-repo-acceptance-proof` artifact has digest:
 
-[Exact-head unit](https://github.com/avaargsh/agentic-aiops/actions/runs/36685817010)
-and [test](https://github.com/avaargsh/agentic-aiops/actions/runs/36685817000)
-push workflows also passed.
+```text
+sha256:b00b49531fd7a79bae0716fc124cb8cbc565154e63e44c3c64de8f5917071b27
+```
+
+GitHub artifacts follow repository retention policy. The pinned revisions,
+machine-readable lock and workflow allow the acceptance to be replayed after the
+artifact expires.
+
+## Baseline ownership
+
+`stack.lock.json` owns cross-repository dependency revisions. Workflow YAML
+resolves those refs from the lock and must not introduce independent hard-coded
+component SHAs.
+
+A dependency change therefore requires:
+
+1. update the exact revision in `stack.lock.json`;
+2. pass lock validation and repository unit tests;
+3. pass the four-repository live acceptance;
+4. preserve both the positive `PROMOTE` gate and negative
+   `INVALID_RELEASE_EVIDENCE` gate;
+5. refresh this human-readable record only after the proof exists.
 
 ## Scope and remaining gates
 
 This freezes the reference software slice and its evidence contract. It does not
 prove production availability, tenant-scale performance, real accelerator
-performance or a trained Decision model. Decision metrics remain synthetic where
-the benchmark uses synthetic inputs. Temporal owns durable orchestration; the
-Control Plane remains thin.
+performance or a trained Decision model. Decision quality measurements remain
+synthetic where the benchmark uses synthetic inputs.
 
-Subsequent changes must record new exact revisions and repeat the main push live
-acceptance before replacing this baseline. Concurrent AgentOS work is integrated
-by pinning verified revisions, without rewriting its history.
+Temporal owns durable orchestration; Kubernetes owns sandbox execution; OPA owns
+policy evaluation; object storage owns evidence retention controls; the Control
+Plane remains thin.
