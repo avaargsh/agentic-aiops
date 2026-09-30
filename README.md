@@ -98,6 +98,7 @@ This is the acceptance transcript, not a pre-recorded success claim: a real run 
 - Investigation tools are read-only; write capability lives behind a separate executor.
 - A model decision never bypasses deterministic authorization.
 - Approval uses a stable action-bound `approval_id`; an unrelated approval cannot authorize the frozen action, and Temporal owns signal deduplication.
+- Deployment `authority_digest` is frozen into evidence, decision, OperationRecord and release evidence; authority drift invalidates resume before a bounded write.
 - The AIOps process does not poll while waiting for human approval.
 - Successful `kubectl scale` is not treated as recovery: Prometheus must verify the post-action SLO.
 - Failed verification can trigger rollback.
