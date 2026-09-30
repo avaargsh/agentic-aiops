@@ -118,7 +118,7 @@ Together they implement:
 Observe → Evidence → Decide → Govern → Durable Run → Act → Verify → Release Gate → Replay
 ```
 
-The four-repository implementation is present. M1 is considered complete only after a fresh live acceptance run produces the captured `PROMOTE` proof and the mutated-evidence negative path produces `BLOCK`; unit tests alone do not satisfy that milestone.
+M1 live software acceptance is verified on pinned public mainline commits: the fresh kind + Temporal run produces `PROMOTE`, and mutated evidence under the same authority produces `BLOCK` with `INVALID_RELEASE_EVIDENCE`. See [the frozen M1 baseline](docs/baselines/m1-public-mainline.md) for exact revisions, push CI and proof artifacts. This proves the reference software slice; it does not establish production SLOs or real GPU performance.
 
 ## Scope after v0.1
 
@@ -134,7 +134,7 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-For cross-repository integration, the public `avaargsh/temp-runner` repository validates this project together with Agent Decision Lab and Cloud Agent Runtime on a disposable kind cluster.
+For cross-repository integration, [four-repo-acceptance](.github/workflows/four-repo-acceptance.yml) verifies pinned public Control Plane, Runtime and Decision commits from this repository's main push CI on disposable kind + Temporal infrastructure.
 
 ## Contributing and license
 
