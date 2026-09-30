@@ -39,6 +39,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: avaargsh/agent-control-plane
+          ref: fix/package-schema-resources
           token: ${{ secrets.AGENT_STACK_GITHUB_TOKEN }}
           path: agent-control-plane
 
