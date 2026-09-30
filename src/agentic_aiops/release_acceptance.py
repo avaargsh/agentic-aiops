@@ -21,6 +21,8 @@ def build_release_evidence(
     operation_id: str | None = None,
     operation_phase: str | None = None,
     operation_evidence_refs: tuple[str, ...] = (),
+    operation_approval_id: str | None = None,
+    authority_digest: str | None = None,
 ) -> dict[str, Any]:
     payload = {
         "release_ref": release_ref,
@@ -31,6 +33,8 @@ def build_release_evidence(
         "operation_id": operation_id,
         "operation_phase": operation_phase,
         "operation_evidence_refs": list(operation_evidence_refs),
+        "operation_approval_id": operation_approval_id,
+        "authority_digest": authority_digest,
     }
     return {**payload, "replay_digest": _digest(payload)}
 
@@ -54,6 +58,8 @@ def write_control_plane_acceptance(
     operation_id: str | None = None,
     operation_phase: str | None = None,
     operation_evidence_refs: tuple[str, ...] = (),
+    operation_approval_id: str | None = None,
+    authority_digest: str | None = None,
 ) -> tuple[Path, Path]:
     evidence = build_release_evidence(
         release_ref=release_ref,
@@ -64,6 +70,8 @@ def write_control_plane_acceptance(
         operation_id=operation_id,
         operation_phase=operation_phase,
         operation_evidence_refs=operation_evidence_refs,
+        operation_approval_id=operation_approval_id,
+        authority_digest=authority_digest,
     )
     metrics = build_acceptance_metrics(remediation_status=remediation_status)
     evidence_path = run_dir / "release-evidence.json"
