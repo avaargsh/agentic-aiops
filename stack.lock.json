@@ -4,7 +4,7 @@
   "dependencies": {
     "control_plane": {
       "repository": "avaargsh/agent-control-plane",
-      "revision": "2d689b89b133dc538d1d75b14f0d2f55e496b783",
+      "revision": "2b35d2ef0b205820582aef06016381756a2290fb",
       "role": "release resolution, authority admission, evidence validation and promotion gate"
     },
     "runtime": {
