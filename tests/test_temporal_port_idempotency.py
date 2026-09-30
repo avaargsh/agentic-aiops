@@ -5,7 +5,11 @@ class Driver:
     async def signal(self, run, *, name, payload): self.signals.append((name,payload))
 
 class Bridge:
-    def __init__(self): self.driver=Driver(); self.approvals=[]
+    def __init__(self):
+        self.driver=Driver(); self.approvals=[]; self.references=[]
+    def reference(self, *, runtime_run_id):
+        self.references.append(runtime_run_id)
+        return f"workflow://{runtime_run_id}"
     async def signal_approval(self, run, *, approval_id, approved, evidence_refs=(), reason=None):
         self.approvals.append((approval_id,approved,tuple(evidence_refs),reason))
 
@@ -19,3 +23,12 @@ def test_adapter_preserves_stable_approval_id_for_temporal_deduplication():
     port.resolve_approval("run",approval_id="approval-001",approved=True,evidence_refs=("evidence://sha256/a",))
     assert [item[0] for item in bridge.approvals] == ["approval-001","approval-001"]
     assert [name for name,_ in bridge.driver.signals] == ["resume_run","resume_run"]
+
+def test_adapter_reference_does_not_start_or_attach_temporal_run():
+    bridge=Bridge(); port=AsyncTemporalPortAdapter(bridge=bridge,run_async=sync)
+
+    ref=port.reference(runtime_run_id="completed-run")
+
+    assert ref == "workflow://completed-run"
+    assert bridge.references == ["completed-run"]
+
