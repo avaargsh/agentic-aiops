@@ -121,6 +121,136 @@ class GoldenIncidentRunner:
             ledger=ledger,
         )
 
+    def replay_durable(
+        self,
+        *,
+        context: DurableRunContext,
+    ) -> GoldenIncidentResult:
+        """Replay a terminal durable action from frozen local evidence only.
+
+        This path deliberately does not attach to the workflow runtime. Terminal
+        Temporal workflow identity remains terminal; historical replay is a
+        read-only validation of the frozen bundle, decision, operation and
+        action receipt.
+        """
+        frozen = self._load_frozen(context)
+        if frozen is None:
+            raise RuntimeError(
+                "cannot replay durable incident without frozen evidence and decision"
+            )
+
+        bundle, action = frozen
+        bundle_sha256 = bundle.sha256()
+        frozen_release = bundle.metadata.get("release_ref")
+        frozen_run = bundle.metadata.get("runtime_run_id")
+        frozen_authority = bundle.metadata.get("authority_digest")
+        ledger_attrs = dict(action.ledger.attributes)
+
+        if context.release_ref and frozen_release != context.release_ref:
+            raise RuntimeError(
+                "frozen evidence release_ref does not match durable run context"
+            )
+        if frozen_run and frozen_run != context.runtime_run_id:
+            raise RuntimeError(
+                "frozen evidence runtime_run_id does not match durable run context"
+            )
+        if context.authority_digest and frozen_authority != context.authority_digest:
+            raise RuntimeError(
+                "frozen evidence authority_digest does not match durable run context"
+            )
+        if frozen_release and ledger_attrs.get("release_ref") != frozen_release:
+            raise RuntimeError(
+                "decision ledger release_ref does not match frozen evidence"
+            )
+        if frozen_run and ledger_attrs.get("runtime_run_id") != frozen_run:
+            raise RuntimeError(
+                "decision ledger runtime_run_id does not match frozen evidence"
+            )
+        if frozen_authority and ledger_attrs.get("authority_digest") != frozen_authority:
+            raise RuntimeError(
+                "decision ledger authority_digest does not match frozen evidence"
+            )
+        if ledger_attrs.get("evidence_digest") != bundle_sha256:
+            raise RuntimeError(
+                "decision ledger evidence_digest does not match frozen evidence"
+            )
+
+        key = action_key(
+            runtime_run_id=context.runtime_run_id,
+            action=action,
+        )
+        result = load_receipt(context.run_dir, key)
+        if result is None:
+            raise RuntimeError(
+                "cannot replay durable incident without action receipt"
+            )
+
+        operation = load_operation(context.run_dir, key)
+        if operation is None:
+            raise RuntimeError(
+                "cannot replay durable incident without operation record"
+            )
+        if operation.phase not in {"VERIFIED", "ROLLED_BACK"}:
+            raise RuntimeError(
+                f"cannot replay non-terminal operation phase: {operation.phase}"
+            )
+        if not operation.result:
+            raise RuntimeError(
+                "terminal operation is missing its durable result"
+            )
+        normalized_receipt_result = json.loads(
+            json.dumps(asdict(result), sort_keys=True)
+        )
+        if normalized_receipt_result != operation.result:
+            raise RuntimeError(
+                "durable action receipt does not match terminal operation result"
+            )
+        if operation.runtime_run_id != context.runtime_run_id:
+            raise RuntimeError(
+                "operation runtime_run_id does not match durable run context"
+            )
+        if operation.decision_id != (action.decision_id or ""):
+            raise RuntimeError(
+                "operation decision_id does not match frozen decision"
+            )
+        if operation.evidence_digest != str(
+            ledger_attrs.get("evidence_digest", "")
+        ):
+            raise RuntimeError(
+                "operation evidence_digest does not match frozen decision"
+            )
+        expected_approval_id = (
+            str(ledger_attrs.get("approval_id") or "")
+            or None
+        )
+        if operation.approval_id != expected_approval_id:
+            raise RuntimeError(
+                "operation approval_id does not match frozen decision"
+            )
+        expected_authority_digest = (
+            str(ledger_attrs.get("authority_digest") or "")
+            or None
+        )
+        if operation.authority_digest != expected_authority_digest:
+            raise RuntimeError(
+                "operation authority_digest does not match frozen decision"
+            )
+
+        return GoldenIncidentResult(
+            bundle.incident.incident_id,
+            bundle_sha256,
+            action,
+            result,
+            (
+                self._event(
+                    "replay",
+                    "loaded",
+                    operation_id=operation.operation_id,
+                    operation_phase=operation.phase,
+                ),
+            ),
+        )
+
     def run_durable(
         self,
         incident: Incident,
