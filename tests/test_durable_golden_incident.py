@@ -3,6 +3,7 @@ import json
 
 from agentic_aiops.durable_runtime import DurableRunContext
 from agentic_aiops.models import Incident
+from agentic_aiops.replay_errors import ReplayErrorCode, ReplayValidationError
 from test_golden_incident import build_runner
 
 
@@ -252,8 +253,56 @@ def test_terminal_replay_rejects_tampered_durable_receipt(tmp_path):
     import pytest
 
     with pytest.raises(
-        RuntimeError,
+        ReplayValidationError,
         match="durable action receipt does not match",
-    ):
+    ) as exc:
         runner.replay_durable(context=ctx)
 
+    assert exc.value.code is ReplayErrorCode.RECEIPT_MISMATCH
+
+
+
+def test_terminal_replay_reports_missing_frozen_state_with_stable_code(tmp_path):
+    import pytest
+
+    runner = build_runner()
+    ctx = context(tmp_path)
+
+    with pytest.raises(ReplayValidationError) as exc:
+        runner.replay_durable(context=ctx)
+
+    assert exc.value.code is ReplayErrorCode.FROZEN_STATE_MISSING
+
+
+def test_terminal_replay_reports_missing_receipt_with_stable_code(tmp_path):
+    import pytest
+
+    runtime = Runtime()
+    runner = build_runner()
+    ctx = context(tmp_path)
+    incident = Incident("inc-001", "checkout latency", "sev2")
+
+    assert runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=ctx,
+    ) is None
+    runtime.state["approval_events"] = [
+        {
+            "approval_id": frozen_approval_id(tmp_path),
+            "approved": True,
+        }
+    ]
+    assert runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=ctx,
+    ) is not None
+
+    receipt = next((ctx.run_dir / "actions").glob("*.json"))
+    receipt.unlink()
+
+    with pytest.raises(ReplayValidationError) as exc:
+        runner.replay_durable(context=ctx)
+
+    assert exc.value.code is ReplayErrorCode.RECEIPT_MISSING
