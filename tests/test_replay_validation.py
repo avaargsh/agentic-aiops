@@ -13,6 +13,7 @@ from agentic_aiops.models import Incident
 from agentic_aiops.operation import OperationRecord
 from agentic_aiops.policy import ActionDecision
 from agentic_aiops.remediation import RemediationResult
+from agentic_aiops.replay_errors import ReplayErrorCode, ReplayValidationError
 from agentic_aiops.replay_validation import (
     normalize_remediation_result,
     validate_frozen_identity,
@@ -83,19 +84,20 @@ def with_ledger(action, **updates):
 
 
 @pytest.mark.parametrize(
-    ("mutation", "message"),
+    ("mutation", "code", "message"),
     [
-        ("context-release", "frozen evidence release_ref"),
-        ("context-run", "frozen evidence runtime_run_id"),
-        ("context-authority", "frozen evidence authority_digest"),
-        ("ledger-release", "decision ledger release_ref"),
-        ("ledger-run", "decision ledger runtime_run_id"),
-        ("ledger-authority", "decision ledger authority_digest"),
-        ("ledger-evidence", "decision ledger evidence_digest"),
+        ("context-release", ReplayErrorCode.RELEASE_MISMATCH, "frozen evidence release_ref"),
+        ("context-run", ReplayErrorCode.RUN_MISMATCH, "frozen evidence runtime_run_id"),
+        ("context-authority", ReplayErrorCode.AUTHORITY_MISMATCH, "frozen evidence authority_digest"),
+        ("ledger-release", ReplayErrorCode.RELEASE_MISMATCH, "decision ledger release_ref"),
+        ("ledger-run", ReplayErrorCode.RUN_MISMATCH, "decision ledger runtime_run_id"),
+        ("ledger-authority", ReplayErrorCode.AUTHORITY_MISMATCH, "decision ledger authority_digest"),
+        ("ledger-evidence", ReplayErrorCode.EVIDENCE_MISMATCH, "decision ledger evidence_digest"),
     ],
 )
 def test_validate_frozen_identity_rejects_each_identity_drift(
     mutation,
+    code,
     message,
 ):
     context, bundle, action, bundle_sha256 = fixture()
@@ -121,13 +123,14 @@ def test_validate_frozen_identity_rejects_each_identity_drift(
     elif mutation == "ledger-evidence":
         action = with_ledger(action, evidence_digest="sha256:other")
 
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(ReplayValidationError, match=message) as exc:
         validate_frozen_identity(
             context=context,
             bundle=bundle,
             action=action,
             bundle_sha256=bundle_sha256,
         )
+    assert exc.value.code is code
 
 
 def terminal_fixture():
@@ -162,20 +165,21 @@ def terminal_fixture():
 
 
 @pytest.mark.parametrize(
-    ("mutation", "message"),
+    ("mutation", "code", "message"),
     [
-        ("phase", "cannot replay non-terminal operation phase"),
-        ("missing-result", "terminal operation is missing"),
-        ("receipt", "durable action receipt does not match"),
-        ("run", "operation runtime_run_id"),
-        ("decision", "operation decision_id"),
-        ("evidence", "operation evidence_digest"),
-        ("approval", "operation approval_id"),
-        ("authority", "operation authority_digest"),
+        ("phase", ReplayErrorCode.OPERATION_NOT_TERMINAL, "cannot replay non-terminal operation phase"),
+        ("missing-result", ReplayErrorCode.RESULT_MISSING, "terminal operation is missing"),
+        ("receipt", ReplayErrorCode.RECEIPT_MISMATCH, "durable action receipt does not match"),
+        ("run", ReplayErrorCode.RUN_MISMATCH, "operation runtime_run_id"),
+        ("decision", ReplayErrorCode.DECISION_MISMATCH, "operation decision_id"),
+        ("evidence", ReplayErrorCode.EVIDENCE_MISMATCH, "operation evidence_digest"),
+        ("approval", ReplayErrorCode.APPROVAL_MISMATCH, "operation approval_id"),
+        ("authority", ReplayErrorCode.AUTHORITY_MISMATCH, "operation authority_digest"),
     ],
 )
 def test_validate_terminal_replay_rejects_each_invariant_drift(
     mutation,
+    code,
     message,
 ):
     context, action, ledger_attrs, receipt, operation = terminal_fixture()
@@ -197,7 +201,7 @@ def test_validate_terminal_replay_rejects_each_invariant_drift(
     elif mutation == "authority":
         operation = replace(operation, authority_digest="sha256:other")
 
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(ReplayValidationError, match=message) as exc:
         validate_terminal_replay(
             context=context,
             action=action,
@@ -205,6 +209,7 @@ def test_validate_terminal_replay_rejects_each_invariant_drift(
             operation=operation,
             receipt=receipt,
         )
+    assert exc.value.code is code
 
 
 def test_replay_validators_accept_consistent_snapshot():
