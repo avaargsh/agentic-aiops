@@ -18,6 +18,7 @@ from .runner import InvestigationRunner
 from .release_acceptance import write_control_plane_acceptance
 from .action_receipt import action_key, load_receipt, store_receipt
 from .operation import OperationRecord, load_operation, store_operation, transition_operation
+from .replay_errors import ReplayErrorCode, ReplayValidationError
 from .replay_validation import (
     validate_frozen_identity,
     validate_terminal_replay,
@@ -139,8 +140,9 @@ class GoldenIncidentRunner:
         """
         frozen = self._load_frozen(context)
         if frozen is None:
-            raise RuntimeError(
-                "cannot replay durable incident without frozen evidence and decision"
+            raise ReplayValidationError(
+                ReplayErrorCode.FROZEN_STATE_MISSING,
+                "cannot replay durable incident without frozen evidence and decision",
             )
 
         bundle, action = frozen
@@ -158,14 +160,16 @@ class GoldenIncidentRunner:
         )
         result = load_receipt(context.run_dir, key)
         if result is None:
-            raise RuntimeError(
-                "cannot replay durable incident without action receipt"
+            raise ReplayValidationError(
+                ReplayErrorCode.RECEIPT_MISSING,
+                "cannot replay durable incident without action receipt",
             )
 
         operation = load_operation(context.run_dir, key)
         if operation is None:
-            raise RuntimeError(
-                "cannot replay durable incident without operation record"
+            raise ReplayValidationError(
+                ReplayErrorCode.OPERATION_MISSING,
+                "cannot replay durable incident without operation record",
             )
         validate_terminal_replay(
             context=context,
