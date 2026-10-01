@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 import json
 from typing import Any, Callable
 
@@ -11,18 +10,15 @@ from .durable_runtime import DurableRunContext, DurableRunPort
 from .action_orchestrator import ActionOrchestrator, OrchestratedAction, ProposedAction
 from .bundle import EvidenceBundle
 from .models import Incident
-from .policy import ActionDecision
 from .ledger import DecisionLedgerEntry
 from .remediation import ExecutionResult, RemediationResult, RollbackResult, SafeRemediationRunner, VerificationResult
 from .runner import InvestigationRunner
 from .release_acceptance import write_control_plane_acceptance
 from .action_receipt import action_key, load_receipt, store_receipt
 from .operation import OperationRecord, load_operation, store_operation, transition_operation
-from .replay_errors import ReplayErrorCode, ReplayValidationError
-from .replay_validation import (
-    validate_frozen_identity,
-    validate_terminal_replay,
-)
+from .durable_replay import load_replay_snapshot
+from .frozen_state import freeze_frozen_state, load_frozen_state
+from .replay_validation import validate_frozen_identity
 
 @dataclass(frozen=True)
 class GoldenIncidentEvent:
@@ -78,118 +74,25 @@ class GoldenIncidentRunner:
         events.append(self._event("remediation", remediation.status.lower(), evidence_ids=list(remediation.evidence_ids)))
         return GoldenIncidentResult(incident.incident_id, bundle_sha256, action, remediation, tuple(events))
 
-    def _freeze(self, context: DurableRunContext, bundle: EvidenceBundle, action: OrchestratedAction) -> None:
-        run_dir = context.run_dir
-        run_dir.mkdir(parents=True, exist_ok=True)
-        bundle.write_json(run_dir / "evidence-bundle.json")
-        (run_dir / "decision.json").write_text(
-            json.dumps(asdict(action), indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-
-    def _load_frozen(self, context: DurableRunContext) -> tuple[EvidenceBundle, OrchestratedAction] | None:
-        bundle_path = context.run_dir / "evidence-bundle.json"
-        decision_path = context.run_dir / "decision.json"
-        if not bundle_path.exists() or not decision_path.exists():
-            return None
-        bundle = EvidenceBundle.read_json(bundle_path)
-        data = json.loads(decision_path.read_text(encoding="utf-8"))
-        proposal_data = data["proposal"]
-        proposal = ProposedAction(
-            action_kind=proposal_data["action_kind"],
-            target=proposal_data["target"],
-            blast_radius=proposal_data["blast_radius"],
-            rollback_available=proposal_data["rollback_available"],
-            evidence_ids=tuple(proposal_data.get("evidence_ids", ())),
-            description=proposal_data.get("description"),
-        )
-        policy = ActionDecision(**data["policy"])
-        ledger_data = data["ledger"]
-        ledger = DecisionLedgerEntry(
-            decision_type=ledger_data["decision_type"],
-            selected_action=ledger_data["selected_action"],
-            policy_reason=ledger_data["policy_reason"],
-            evidence_ids=tuple(ledger_data.get("evidence_ids", ())),
-            confidence=ledger_data.get("confidence"),
-            requires_approval=ledger_data.get("requires_approval", False),
-            outcome=ledger_data.get("outcome"),
-            attributes=dict(ledger_data.get("attributes", {})),
-        )
-        return bundle, OrchestratedAction(
-            proposal=proposal,
-            selected_path=data["selected_path"],
-            model_confidence=data.get("model_confidence"),
-            decision_id=data.get("decision_id"),
-            policy=policy,
-            execution_allowed=data["execution_allowed"],
-            approval_required=data["approval_required"],
-            ledger=ledger,
-        )
-
     def replay_durable(
         self,
         *,
         context: DurableRunContext,
     ) -> GoldenIncidentResult:
-        """Replay a terminal durable action from frozen local evidence only.
+        """Replay a terminal durable action from a validated frozen snapshot."""
 
-        This path deliberately does not attach to the workflow runtime. Terminal
-        Temporal workflow identity remains terminal; historical replay is a
-        read-only validation of the frozen bundle, decision, operation and
-        action receipt.
-        """
-        frozen = self._load_frozen(context)
-        if frozen is None:
-            raise ReplayValidationError(
-                ReplayErrorCode.FROZEN_STATE_MISSING,
-                "cannot replay durable incident without frozen evidence and decision",
-            )
-
-        bundle, action = frozen
-        bundle_sha256 = bundle.sha256()
-        ledger_attrs = validate_frozen_identity(
-            context=context,
-            bundle=bundle,
-            action=action,
-            bundle_sha256=bundle_sha256,
-        )
-
-        key = action_key(
-            runtime_run_id=context.runtime_run_id,
-            action=action,
-        )
-        result = load_receipt(context.run_dir, key)
-        if result is None:
-            raise ReplayValidationError(
-                ReplayErrorCode.RECEIPT_MISSING,
-                "cannot replay durable incident without action receipt",
-            )
-
-        operation = load_operation(context.run_dir, key)
-        if operation is None:
-            raise ReplayValidationError(
-                ReplayErrorCode.OPERATION_MISSING,
-                "cannot replay durable incident without operation record",
-            )
-        validate_terminal_replay(
-            context=context,
-            action=action,
-            ledger_attrs=ledger_attrs,
-            operation=operation,
-            receipt=result,
-        )
-
+        snapshot = load_replay_snapshot(context)
         return GoldenIncidentResult(
-            bundle.incident.incident_id,
-            bundle_sha256,
-            action,
-            result,
+            snapshot.bundle.incident.incident_id,
+            snapshot.bundle_sha256,
+            snapshot.action,
+            snapshot.remediation,
             (
                 self._event(
                     "replay",
                     "loaded",
-                    operation_id=operation.operation_id,
-                    operation_phase=operation.phase,
+                    operation_id=snapshot.operation.operation_id,
+                    operation_phase=snapshot.operation.phase,
                 ),
             ),
         )
@@ -206,7 +109,7 @@ class GoldenIncidentRunner:
             session_id=context.session_id,
         )
 
-        frozen = self._load_frozen(context)
+        frozen = load_frozen_state(context)
         if frozen is None:
             investigation = self.investigation.run(incident)
             bundle = investigation.bundle
@@ -278,7 +181,7 @@ class GoldenIncidentRunner:
                         },
                     ),
                 )
-            self._freeze(context, bundle, action)
+            freeze_frozen_state(context, bundle, action)
         else:
             bundle, action = frozen
             bundle_sha256 = bundle.sha256()
