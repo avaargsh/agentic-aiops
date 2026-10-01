@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import json
 
 from agentic_aiops.durable_runtime import DurableRunContext
@@ -170,3 +171,89 @@ def test_golden_incident_contract_preserves_release_run_runtime_and_evidence_ide
     assert control_plane_run["spec"]["workflowRef"] == f"temporal://{run_id}"
     assert control_plane_run["spec"]["sandboxRef"] == f"sandbox://{run_id}"
     assert frozen_bundle_ref in control_plane_run["spec"]["evidenceRefs"]
+
+def test_terminal_replay_uses_frozen_receipt_without_runtime_or_live_reread(
+    tmp_path,
+):
+    runtime = Runtime()
+    runner = build_runner()
+    ctx = context(tmp_path)
+    incident = Incident("inc-001", "checkout latency", "sev2")
+
+    assert runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=ctx,
+    ) is None
+    runtime.state["approval_events"] = [
+        {
+            "approval_id": frozen_approval_id(tmp_path),
+            "approved": True,
+        }
+    ]
+    completed = runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=ctx,
+    )
+    assert completed is not None
+    assert completed.remediation.status == "VERIFIED"
+    runtime_event_count = len(runtime.events)
+
+    def no_live_reread(*args, **kwargs):
+        raise AssertionError("terminal replay must not use live dependencies")
+
+    runner.investigation.run = no_live_reread
+    runner.orchestrator.decide = no_live_reread
+    runner.remediation.run = no_live_reread
+
+    replayed = runner.replay_durable(context=ctx)
+
+    assert replayed.bundle_sha256 == completed.bundle_sha256
+    assert replayed.action == completed.action
+    assert json.loads(
+        json.dumps(asdict(replayed.remediation), sort_keys=True)
+    ) == json.loads(
+        json.dumps(asdict(completed.remediation), sort_keys=True)
+    )
+    assert replayed.events[0].phase == "replay"
+    assert replayed.events[0].status == "loaded"
+    assert len(runtime.events) == runtime_event_count
+
+
+def test_terminal_replay_rejects_tampered_durable_receipt(tmp_path):
+    runtime = Runtime()
+    runner = build_runner()
+    ctx = context(tmp_path)
+    incident = Incident("inc-001", "checkout latency", "sev2")
+
+    assert runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=ctx,
+    ) is None
+    runtime.state["approval_events"] = [
+        {
+            "approval_id": frozen_approval_id(tmp_path),
+            "approved": True,
+        }
+    ]
+    assert runner.run_durable(
+        incident,
+        runtime=runtime,
+        context=ctx,
+    ) is not None
+
+    receipt = next((ctx.run_dir / "actions").glob("*.json"))
+    payload = json.loads(receipt.read_text())
+    payload["status"] = "ROLLED_BACK"
+    receipt.write_text(json.dumps(payload))
+
+    import pytest
+
+    with pytest.raises(
+        RuntimeError,
+        match="durable action receipt does not match",
+    ):
+        runner.replay_durable(context=ctx)
+

@@ -26,20 +26,27 @@ def build_runner(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["start", "continue", "status"])
+    parser.add_argument("command", choices=["start", "continue", "status", "replay"])
     parser.add_argument("--run-id", default="golden-checkout-live-001")
     parser.add_argument("--session-id", default="golden-demo")
     parser.add_argument("--prometheus", default=os.environ.get("PROMETHEUS_URL", "http://127.0.0.1:19090"))
     parser.add_argument("--kube-api", default=os.environ.get("KUBERNETES_API", "http://127.0.0.1:18001"))
     parser.add_argument("--decision", default=os.environ.get("DECISION_GATEWAY_URL", "http://127.0.0.1:8080"))
     args = parser.parse_args()
-    runtime = build_temporal_port()
     context = DurableRunContext(
         args.run_id,
         args.session_id,
         release_ref=os.environ.get("AGENT_RELEASE_NAME"),
         authority_digest=os.environ.get("AGENT_AUTHORITY_DIGEST"),
     )
+    if args.command == "replay":
+        result = build_runner(args).replay_durable(context=context)
+        print(json.dumps(result.to_dict(), indent=2, default=str))
+        if result.remediation.status != "VERIFIED":
+            raise SystemExit(3)
+        return
+
+    runtime = build_temporal_port()
     if args.command == "start":
         run = runtime.start_or_attach(
             runtime_run_id=args.run_id,
