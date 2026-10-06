@@ -1,9 +1,15 @@
 name: unit
 
+# test.yml 已在 PR 中覆盖 Python 3.12 pytest；这里只保留手动聚焦复跑。
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   pytest:
