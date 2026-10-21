@@ -54,7 +54,7 @@ def test_approval_cli_references_existing_run(
     approved: bool,
 ) -> None:
     runtime = FakeRuntime()
-    monkeypatch.setattr(approval_cli, "build_temporal_port", lambda: runtime)
+    monkeypatch.setattr(approval_cli, "_build_temporal_port", lambda: runtime)
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -91,7 +91,7 @@ def test_approval_cli_refuses_terminal_run_without_signaling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime = FakeRuntime(terminal=True)
-    monkeypatch.setattr(approval_cli, "build_temporal_port", lambda: runtime)
+    monkeypatch.setattr(approval_cli, "_build_temporal_port", lambda: runtime)
     monkeypatch.setattr(
         "sys.argv",
         [
