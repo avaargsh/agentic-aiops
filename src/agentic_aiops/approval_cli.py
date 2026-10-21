@@ -16,7 +16,10 @@ def main() -> None:
     args = parser.parse_args()
 
     runtime = build_temporal_port()
-    run = runtime.start_or_attach(runtime_run_id=args.run_id, session_id=args.session_id)
+    # Approval resolves a workflow that already exists. Do not run
+    # start-or-attach here: creating/attaching has different lifecycle
+    # semantics and can race with the workflow transitioning to terminal.
+    run = runtime.reference(runtime_run_id=args.run_id)
     before = runtime.status(run)
     if before.get("terminal"):
         raise SystemExit(f"run {args.run_id} is already terminal")
