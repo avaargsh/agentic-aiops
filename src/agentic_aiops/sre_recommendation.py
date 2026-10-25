@@ -183,9 +183,16 @@ def validate_sre_recommendation(
 
     multiplier = payload["risk_context_multiplier"]
     if multiplier is not None:
-        if type(multiplier) not in (int, float) or not math.isfinite(multiplier) or multiplier < 1:
+        if type(multiplier) not in (int, float):
             raise ValueError("risk_context_multiplier must be null or a finite number >= 1")
-        multiplier = float(multiplier)
+        try:
+            multiplier = float(multiplier)
+        except OverflowError as exc:
+            raise ValueError(
+                "risk_context_multiplier must be null or a finite number >= 1"
+            ) from exc
+        if not math.isfinite(multiplier) or multiplier < 1:
+            raise ValueError("risk_context_multiplier must be null or a finite number >= 1")
 
     evidence_ids = _string_tuple(payload["evidence_ids"], "evidence_ids")
     if not evidence_ids:
