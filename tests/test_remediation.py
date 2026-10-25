@@ -64,6 +64,7 @@ def write_action():
         blast_radius="single-workload",
         rollback_available=True,
         evidence_ids=("e-before",),
+        change_id="change-1",
     )
 
 
