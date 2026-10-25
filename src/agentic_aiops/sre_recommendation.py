@@ -201,6 +201,19 @@ def validate_sre_recommendation(
     if calibration_id is not None:
         calibration_id = _nonempty_string(calibration_id, "calibration_id")
 
+    # The only valid unscored rejection is a deterministic hard-constraint
+    # rejection. All loss-scored recommendations must carry their model,
+    # calibration and decision-context multiplier provenance.
+    deterministic_constraint_rejection = (
+        action == "reject" and reason_code == "HARD_CONSTRAINT_VIOLATION"
+    )
+    if raw_losses and not deterministic_constraint_rejection:
+        if model_id is None or calibration_id is None or multiplier is None:
+            raise ValueError(
+                "scored recommendation requires model_id, calibration_id, "
+                "and risk_context_multiplier provenance"
+            )
+
     return SREDecisionRecommendation(
         schema_version=SCHEMA_VERSION,
         change_id=change_id,
