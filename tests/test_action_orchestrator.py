@@ -141,7 +141,6 @@ def proposal_with_change():
         blast_radius="single-workload",
         rollback_available=True,
         evidence_ids=("e-1",),
-        change_id="change-1",
     )
 
 
@@ -150,6 +149,7 @@ def test_sre_reject_vetoes_model_execution():
         decision_client=FakeDecisionClient("execute"),
     ).decide(
         proposal_with_change(),
+        change_id="change-1",
         sre_recommendation=sre_recommendation("reject"),
     )
     assert result.selected_path == "fallback"
@@ -163,6 +163,7 @@ def test_sre_human_review_clamps_model_execute_to_non_execution():
         decision_client=FakeDecisionClient("execute"),
     ).decide(
         proposal_with_change(),
+        change_id="change-1",
         sre_recommendation=sre_recommendation("human_review"),
     )
     assert result.selected_path == "human_review"
@@ -176,6 +177,7 @@ def test_canary_is_not_mapped_to_full_execution_without_canary_executor():
         decision_client=FakeDecisionClient("execute"),
     ).decide(
         proposal_with_change(),
+        change_id="change-1",
         sre_recommendation=sre_recommendation("canary"),
     )
     assert result.selected_path == "human_review"
@@ -189,6 +191,7 @@ def test_sre_allow_does_not_upgrade_generic_fallback_to_execute():
         decision_client=FakeDecisionClient("fallback"),
     ).decide(
         proposal_with_change(),
+        change_id="change-1",
         sre_recommendation=sre_recommendation("allow"),
     )
     assert result.selected_path == "fallback"
@@ -209,5 +212,6 @@ def test_invalid_sre_recommendation_aborts_before_decision(changes, message):
             decision_client=FakeDecisionClient("execute"),
         ).decide(
             proposal_with_change(),
+            change_id="change-1",
             sre_recommendation=sre_recommendation("allow", **changes),
         )
