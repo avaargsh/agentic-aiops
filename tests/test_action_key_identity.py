@@ -53,8 +53,10 @@ def test_action_key_is_bound_to_sre_recommendation_digest():
     assert first != second
 
 
-def test_legacy_action_without_identity_keeps_deterministic_receipt_key():
+def test_legacy_action_without_identity_keeps_historical_receipt_key():
+    # Golden digest from the pre-change-id key payload. Existing durable runs
+    # must still resolve their receipts after upgrading this code.
     action = make_action()
-    assert action_key(runtime_run_id="run-1", action=action) == action_key(
-        runtime_run_id="run-1", action=action
+    assert action_key(runtime_run_id="run-1", action=action) == (
+        "52e895e0bd43d1eeb4437afc534f2de23bdd85eae39263514a12addb328105a6"
     )
