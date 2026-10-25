@@ -46,3 +46,13 @@
 - [x] recovery success rate
 - [ ] evidence precision / coverage
 - [ ] MTTD / MTTR simulation
+
+
+## v0.5 — SRE Decision Engine Integration
+- [ ] add a dedicated typed adapter for sre-decision/v1; do not overload the candidate-choice API
+- [ ] bind recommendation change ID, evidence IDs and digest to the active proposal/run
+- [ ] propagate timestamped SLO/error-budget and active-incident context
+- [ ] retain risk/model/calibration/policy provenance in the decision ledger
+- [ ] prove that recommendations cannot bypass ActionPolicy, approval or control-plane authority
+- [ ] replay time-split change/incident cases and compare expected loss with rules-only baseline
+- [ ] run shadow mode before enabling any bounded automated action
