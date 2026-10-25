@@ -254,7 +254,7 @@ def test_invalid_sre_recommendation_aborts_before_decision(changes, message):
 
 @pytest.mark.parametrize(
     "confidence",
-    [math.nan, math.inf, -0.01, 1.01, True, "0.95"],
+    [math.nan, math.inf, 10**1000, -0.01, 1.01, True, "0.95"],
 )
 def test_invalid_model_confidence_is_rejected_before_returning_a_decision(confidence):
     with pytest.raises(ValueError, match="confidence"):
