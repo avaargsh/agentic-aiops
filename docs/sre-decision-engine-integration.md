@@ -2,7 +2,7 @@
 
 ## Status
 
-This document defines the integration boundary between agent-decision-lab's SRE expected-loss recommendation contract and agentic-aiops' evidence/authorization workflow. It is a design contract only: this repository does not yet call a dedicated SRE decision endpoint or consume the new sre-decision/v1 schema at runtime.
+This document defines the integration boundary between agent-decision-lab's SRE expected-loss recommendation contract and agentic-aiops' evidence/authorization workflow. A strict `validate_sre_recommendation()` helper now validates schema version, current change identity, evidence-bundle membership, typed losses and `authorized=false`. The helper is tested but is **not yet wired into ActionOrchestrator or a dedicated HTTP endpoint**; this PR establishes the contract gate without changing execution behavior.
 
 ## Ownership
 
