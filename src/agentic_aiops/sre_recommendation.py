@@ -38,9 +38,15 @@ def _nonempty_string(value: object, name: str) -> str:
 
 
 def _finite_nonnegative(value: object, name: str) -> float:
-    if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+    if type(value) not in (int, float):
         raise ValueError(f"{name} values must be finite non-negative numbers")
-    return float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{name} values must be finite non-negative numbers") from exc
+    if not math.isfinite(number) or number < 0:
+        raise ValueError(f"{name} values must be finite non-negative numbers")
+    return number
 
 
 def _string_tuple(value: object, name: str) -> tuple[str, ...]:
