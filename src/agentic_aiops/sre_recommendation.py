@@ -163,6 +163,18 @@ def validate_sre_recommendation(
     if overlap:
         raise ValueError("an action cannot have both an expected loss and an exclusion reason")
 
+    covered_actions = set(raw_losses) | set(raw_excluded)
+    # Human review can be an unscored abstention action; every other action must
+    # either have a loss estimate or carry an explicit deterministic exclusion.
+    if action == "human_review" and action not in covered_actions:
+        covered_actions.add(action)
+    missing_actions = sorted(ACTIONS - covered_actions)
+    if missing_actions:
+        raise ValueError(
+            "every action must have an expected loss or an exclusion reason; missing: "
+            + ", ".join(missing_actions)
+        )
+
     multiplier = payload["risk_context_multiplier"]
     if multiplier is not None:
         if type(multiplier) not in (int, float) or not math.isfinite(multiplier) or multiplier < 1:
