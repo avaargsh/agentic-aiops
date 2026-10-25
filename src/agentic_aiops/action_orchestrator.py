@@ -209,7 +209,7 @@ class ActionOrchestrator:
                 if isinstance(candidate, str) and candidate in self._CANDIDATES:
                     selected_path = candidate
                     confidence = _validated_model_confidence(
-                        decision.get("confidence", 0.0)
+                        decision.get("confidence")
                     )
             elif response.get("action") == "FALLBACK":
                 selected_path = "fallback"
