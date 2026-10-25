@@ -24,6 +24,35 @@ class ProposedAction:
     # Identity is supplied by the trusted proposal/run builder, not the model.
     change_id: str | None = None
 
+    def __post_init__(self) -> None:
+        for field_name in ("action_kind", "target", "blast_radius"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
+            object.__setattr__(self, field_name, value.strip())
+
+        if type(self.rollback_available) is not bool:
+            raise ValueError("rollback_available must be a boolean")
+
+        if not isinstance(self.evidence_ids, (tuple, list)):
+            raise ValueError("evidence_ids must be a sequence of unique non-empty strings")
+        normalized_evidence: list[str] = []
+        for evidence_id in self.evidence_ids:
+            if not isinstance(evidence_id, str) or not evidence_id.strip():
+                raise ValueError("evidence_ids must contain unique non-empty strings")
+            normalized_evidence.append(evidence_id.strip())
+        if len(normalized_evidence) != len(set(normalized_evidence)):
+            raise ValueError("evidence_ids must contain unique values")
+        object.__setattr__(self, "evidence_ids", tuple(normalized_evidence))
+
+        if self.change_id is not None:
+            if not isinstance(self.change_id, str) or not self.change_id.strip():
+                raise ValueError("change_id must be a non-empty string or None")
+            object.__setattr__(self, "change_id", self.change_id.strip())
+
+        if self.description is not None and not isinstance(self.description, str):
+            raise ValueError("description must be a string or None")
+
 
 @dataclass(frozen=True)
 class OrchestratedAction:
