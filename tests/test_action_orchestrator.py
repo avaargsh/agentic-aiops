@@ -315,3 +315,22 @@ def test_proposed_action_rejects_invalid_change_identity(change_id):
             rollback_available=True,
             change_id=change_id,
         )
+
+
+def test_execute_candidate_without_confidence_fails_closed():
+    class MissingConfidenceClient:
+        def decide(self, **kwargs):
+            return {"decision": {"candidate": "execute"}}
+
+    result = ActionOrchestrator(
+        decision_client=MissingConfidenceClient(),
+    )
+    with pytest.raises(ValueError, match="confidence"):
+        result.decide(
+            ProposedAction(
+                action_kind="read",
+                target="metrics://checkout",
+                blast_radius="single-workload",
+                rollback_available=True,
+            )
+        )
