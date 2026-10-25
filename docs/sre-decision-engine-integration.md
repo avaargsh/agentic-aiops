@@ -41,6 +41,8 @@ Current library behavior:
 5. An SRE `reject` never selects execution. `human_review` is non-executable. `canary` is downgraded to human review until a canary-specific executor is available. `allow` does not override a generic model fallback.
 6. Existing deterministic ActionPolicy, approval requirements, runtime authority and live-effect boundaries remain in force.
 7. Post-action verification and rollback remain the execution runner's responsibility.
+8. Frozen-state recovery restores `ProposedAction.change_id`; replay validation rejects a mismatch between the proposal and Decision Ledger. Receipt idempotency keys include the trusted change ID and SRE recommendation digest when present, while preserving the historical key shape for legacy actions without either identity field.
+9. Provider-supplied confidence must be a finite number in `[0, 1]`; malformed confidence and missing confidence on a selected candidate fail closed instead of being silently coerced.
 
 Remaining gaps: no freshness/assessment digest or cryptographic authenticity check exists yet, and the recommendation is an optional caller-supplied input rather than a mandatory SRE service result. Do not use this optional path as a production enforcement boundary until recommendation provenance and run/evidence freshness are authenticated. Do not overload the current generic `/decision` candidate-choice API; a future remote SRE service should use a dedicated typed adapter or versioned endpoint.
 
