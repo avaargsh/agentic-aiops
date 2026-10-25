@@ -49,7 +49,8 @@
 
 
 ## v0.5 — SRE Decision Engine Integration
-- [ ] add a dedicated typed adapter for sre-decision/v1; do not overload the candidate-choice API
+- [x] add a strict sre-decision/v1 recommendation validator for schema, active change identity, evidence membership and non-authorization
+- [ ] wire the typed validator to a dedicated adapter; do not overload the candidate-choice API
 - [ ] bind recommendation change ID, evidence IDs and digest to the active proposal/run
 - [ ] propagate timestamped SLO/error-budget and active-incident context
 - [ ] retain risk/model/calibration/policy provenance in the decision ledger
