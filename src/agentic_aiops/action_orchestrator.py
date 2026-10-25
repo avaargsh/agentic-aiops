@@ -78,13 +78,15 @@ class ApprovalSink(Protocol):
 
 def _validated_model_confidence(value: object) -> float:
     """Validate provider output before storing it in the decision ledger."""
-    if (
-        type(value) not in (int, float)
-        or not math.isfinite(value)
-        or not 0.0 <= value <= 1.0
-    ):
+    if type(value) not in (int, float):
         raise ValueError("model confidence must be a finite numeric value in [0, 1]")
-    return float(value)
+    try:
+        confidence = float(value)
+    except OverflowError as exc:
+        raise ValueError("model confidence must be a finite numeric value in [0, 1]") from exc
+    if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+        raise ValueError("model confidence must be a finite numeric value in [0, 1]")
+    return confidence
 
 
 def _sre_execution_override(
