@@ -60,6 +60,10 @@ def test_valid_recommendation_is_typed_and_never_authorizes_execution():
         ({"evidence_ids": ["diff:change-123", "diff:change-123"]}, "unique"),
         ({"expected_losses": {"canary": math.nan}}, "finite non-negative"),
         ({"expected_losses": {"canary": -1}}, "finite non-negative"),
+        (
+            {"expected_losses": {"canary": 2.0}, "excluded_actions": {}},
+            "every action must have an expected loss or an exclusion reason",
+        ),
         ({"action": "canary", "expected_losses": {"allow": 1.0}}, "selected action must have expected loss"),
         ({"action": "canary", "expected_losses": {"canary": 2.0}, "excluded_actions": {"canary": "blocked"}}, "cannot be excluded"),
         ({"risk_context_multiplier": 0.5}, "risk_context_multiplier"),
@@ -103,6 +107,14 @@ def test_recommendation_rejects_when_current_evidence_set_is_empty():
 
 
 def test_recommendation_must_not_mark_a_scored_action_as_excluded():
-    candidate = payload(action="reject", expected_losses={"reject": 15.0}, excluded_actions={"allow": "blocked"})
+    candidate = payload(
+        action="reject",
+        expected_losses={"reject": 15.0},
+        excluded_actions={
+            "allow": "blocked",
+            "canary": "blocked",
+            "human_review": "blocked",
+        },
+    )
     result = validate(candidate)
     assert result.action == "reject"
