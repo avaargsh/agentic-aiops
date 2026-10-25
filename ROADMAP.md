@@ -54,6 +54,9 @@
 - [x] optional veto-only integration into ActionOrchestrator; allow cannot upgrade a generic fallback
 - [x] SRE reject and human-review paths cannot execute; canary is held for a dedicated executor
 - [x] persist recommendation JSON and SHA-256 plus risk/policy reason in the Decision Ledger
+- [x] preserve change_id through frozen-state recovery and reject proposal/ledger identity drift
+- [x] bind receipt idempotency keys to change_id and SRE recommendation digest without changing legacy key shape
+- [x] reject malformed, out-of-range, non-finite, and missing model confidence for selected candidates
 - [ ] dedicated authenticated client/endpoint for trusted SRE recommendations
 - [ ] bind decision freshness/assessment digest and durable Run identity; add signature/authentication provenance
 - [ ] make required SRE review policy explicit for protected/high-risk change classes
