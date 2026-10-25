@@ -141,7 +141,40 @@ def proposal_with_change():
         blast_radius="single-workload",
         rollback_available=True,
         evidence_ids=("e-1",),
+        change_id="change-1",
     )
+
+
+def test_sre_recommendation_requires_change_identity_from_active_proposal():
+    proposal = ProposedAction(
+        action_kind="read",
+        target="metrics://checkout",
+        blast_radius="single-workload",
+        rollback_available=True,
+        evidence_ids=("e-1",),
+    )
+    with pytest.raises(ValueError, match="proposal.change_id"):
+        ActionOrchestrator(
+            decision_client=FakeDecisionClient("execute"),
+        ).decide(
+            proposal,
+            change_id="change-1",
+            sre_recommendation=sre_recommendation("allow"),
+        )
+
+
+def test_external_change_id_must_match_active_proposal_identity():
+    with pytest.raises(ValueError, match="does not match proposal.change_id"):
+        ActionOrchestrator(
+            decision_client=FakeDecisionClient("execute"),
+        ).decide(
+            proposal_with_change(),
+            change_id="attacker-selected-change",
+            sre_recommendation=sre_recommendation(
+                "allow",
+                change_id="attacker-selected-change",
+            ),
+        )
 
 
 def test_sre_reject_vetoes_model_execution():
