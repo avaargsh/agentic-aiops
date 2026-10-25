@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from agentic_aiops.action_orchestrator import (
@@ -247,4 +249,22 @@ def test_invalid_sre_recommendation_aborts_before_decision(changes, message):
             proposal_with_change(),
             change_id="change-1",
             sre_recommendation=sre_recommendation("allow", **changes),
+        )
+
+
+@pytest.mark.parametrize(
+    "confidence",
+    [math.nan, math.inf, -0.01, 1.01, True, "0.95"],
+)
+def test_invalid_model_confidence_is_rejected_before_returning_a_decision(confidence):
+    with pytest.raises(ValueError, match="confidence"):
+        ActionOrchestrator(
+            decision_client=FakeDecisionClient("execute", confidence=confidence),
+        ).decide(
+            ProposedAction(
+                action_kind="read",
+                target="metrics://checkout",
+                blast_radius="single-workload",
+                rollback_available=True,
+            )
         )
