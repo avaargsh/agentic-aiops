@@ -118,3 +118,16 @@ def test_recommendation_must_not_mark_a_scored_action_as_excluded():
     )
     result = validate(candidate)
     assert result.action == "reject"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"model_id": None},
+        {"calibration_id": None},
+        {"risk_context_multiplier": None},
+    ],
+)
+def test_scored_recommendation_requires_model_calibration_and_context_provenance(changes):
+    with pytest.raises(ValueError, match="scored recommendation requires"):
+        validate(payload(**changes))
