@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol, Sequence
@@ -44,6 +45,17 @@ class ApprovalSink(Protocol):
         evidence_ids: Sequence[str],
     ) -> str:
         ...
+
+
+def _validated_model_confidence(value: object) -> float:
+    """Validate provider output before storing it in the decision ledger."""
+    if (
+        type(value) not in (int, float)
+        or not math.isfinite(value)
+        or not 0.0 <= value <= 1.0
+    ):
+        raise ValueError("model confidence must be a finite numeric value in [0, 1]")
+    return float(value)
 
 
 def _sre_execution_override(
@@ -149,6 +161,8 @@ class ActionOrchestrator:
                 candidates=list(self._CANDIDATES),
                 context=context,
             )
+            if not isinstance(response, Mapping):
+                raise ValueError("decision response must be an object")
 
             selected_path = "fallback"
             confidence = None
@@ -160,8 +174,14 @@ class ActionOrchestrator:
 
             decision = response.get("decision")
             if decision is not None:
-                selected_path = str(decision["candidate"])
-                confidence = float(decision.get("confidence", 0.0))
+                if not isinstance(decision, Mapping):
+                    raise ValueError("decision payload must be an object")
+                candidate = decision.get("candidate")
+                if isinstance(candidate, str) and candidate in self._CANDIDATES:
+                    selected_path = candidate
+                    confidence = _validated_model_confidence(
+                        decision.get("confidence", 0.0)
+                    )
             elif response.get("action") == "FALLBACK":
                 selected_path = "fallback"
 
