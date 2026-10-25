@@ -268,3 +268,50 @@ def test_invalid_model_confidence_is_rejected_before_returning_a_decision(confid
                 rollback_available=True,
             )
         )
+
+
+def test_proposed_action_copies_evidence_ids_into_an_immutable_tuple():
+    evidence_ids = ["e-1", "e-2"]
+    proposal = ProposedAction(
+        action_kind="read",
+        target="metrics://checkout",
+        blast_radius="single-workload",
+        rollback_available=True,
+        evidence_ids=evidence_ids,
+        change_id="change-1",
+    )
+    evidence_ids.append("e-injected-after-construction")
+    assert proposal.evidence_ids == ("e-1", "e-2")
+    assert isinstance(proposal.evidence_ids, tuple)
+
+
+@pytest.mark.parametrize(
+    "evidence_ids",
+    [
+        ["e-1", "e-1"],
+        ["e-1", "  "],
+        "e-1",
+        None,
+    ],
+)
+def test_proposed_action_rejects_ambiguous_or_mutable_evidence_contract(evidence_ids):
+    with pytest.raises(ValueError, match="evidence_ids"):
+        ProposedAction(
+            action_kind="read",
+            target="metrics://checkout",
+            blast_radius="single-workload",
+            rollback_available=True,
+            evidence_ids=evidence_ids,
+        )
+
+
+@pytest.mark.parametrize("change_id", ["", "  ", 123])
+def test_proposed_action_rejects_invalid_change_identity(change_id):
+    with pytest.raises(ValueError, match="change_id"):
+        ProposedAction(
+            action_kind="read",
+            target="metrics://checkout",
+            blast_radius="single-workload",
+            rollback_available=True,
+            change_id=change_id,
+        )
