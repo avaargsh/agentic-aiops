@@ -49,11 +49,14 @@
 
 
 ## v0.5 — SRE Decision Engine Integration
-- [x] add a strict sre-decision/v1 recommendation validator for schema, active change identity, evidence membership and non-authorization
-- [ ] wire the typed validator to a dedicated adapter; do not overload the candidate-choice API
-- [ ] bind recommendation change ID, evidence IDs and digest to the active proposal/run
-- [ ] propagate timestamped SLO/error-budget and active-incident context
-- [ ] retain risk/model/calibration/policy provenance in the decision ledger
-- [ ] prove that recommendations cannot bypass ActionPolicy, approval or control-plane authority
+- [x] strict sre-decision/v1 recommendation validator for schema, change identity, evidence membership and non-authorization
+- [x] optional veto-only integration into ActionOrchestrator; allow cannot upgrade a generic fallback
+- [x] SRE reject and human-review paths cannot execute; canary is held for a dedicated executor
+- [x] persist recommendation JSON and SHA-256 plus risk/policy reason in the Decision Ledger
+- [ ] dedicated authenticated client/endpoint for trusted SRE recommendations
+- [ ] bind decision freshness/assessment digest and durable Run identity; add signature/authentication provenance
+- [ ] make required SRE review policy explicit for protected/high-risk change classes
+- [ ] propagate timestamped SLO/error-budget and active-incident context from an authoritative source
+- [ ] live cross-repo/control-plane acceptance proving no authorization bypass
 - [ ] replay time-split change/incident cases and compare expected loss with rules-only baseline
 - [ ] run shadow mode before enabling any bounded automated action
