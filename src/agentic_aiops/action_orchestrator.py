@@ -46,6 +46,33 @@ class ApprovalSink(Protocol):
         ...
 
 
+def _sre_execution_override(
+    recommendation: SREDecisionRecommendation | None,
+) -> tuple[str | None, ActionDecision | None]:
+    """Return a non-authorizing route/policy override for restrictive SRE advice."""
+    if recommendation is None or recommendation.action == "allow":
+        return None, None
+    if recommendation.action == "reject":
+        return "fallback", ActionDecision(
+            allowed=False,
+            requires_approval=False,
+            reason_code="SRE_REJECT_RECOMMENDATION",
+        )
+    if recommendation.action == "human_review":
+        return "human_review", ActionDecision(
+            allowed=False,
+            requires_approval=True,
+            reason_code="SRE_REQUIRES_HUMAN_REVIEW",
+        )
+    if recommendation.action == "canary":
+        return "human_review", ActionDecision(
+            allowed=False,
+            requires_approval=True,
+            reason_code="SRE_CANARY_REQUIRES_DEDICATED_EXECUTOR",
+        )
+    raise ValueError(f"unsupported validated SRE action: {recommendation.action}")
+
+
 class ActionOrchestrator:
     """Combine learned routing, optional SRE vetoes, and deterministic authorization.
 
@@ -99,14 +126,10 @@ class ActionOrchestrator:
                 available_evidence_ids=proposal.evidence_ids,
             )
 
-        # Explicit SRE rejection or human review short-circuits model inference.
-        # Canary is also routed to review because this runner has no canary executor.
-        if validated_sre is not None and validated_sre.action == "reject":
-            selected_path = "fallback"
-            confidence = None
-            decision_id = None
-        elif validated_sre is not None and validated_sre.action in {"human_review", "canary"}:
-            selected_path = "human_review"
+        # Restrictive SRE advice short-circuits model inference; "allow" does not.
+        override_path, override_policy = _sre_execution_override(validated_sre)
+        if override_path is not None:
+            selected_path = override_path
             confidence = None
             decision_id = None
         else:
@@ -142,30 +165,11 @@ class ActionOrchestrator:
             elif response.get("action") == "FALLBACK":
                 selected_path = "fallback"
 
-        policy = self.policy.evaluate(
+        policy = override_policy or self.policy.evaluate(
             action_kind=proposal.action_kind,
             blast_radius=proposal.blast_radius,
             rollback_available=proposal.rollback_available,
         )
-        if validated_sre is not None:
-            if validated_sre.action == "reject":
-                policy = ActionDecision(
-                    allowed=False,
-                    requires_approval=False,
-                    reason_code="SRE_REJECT_RECOMMENDATION",
-                )
-            elif validated_sre.action == "human_review":
-                policy = ActionDecision(
-                    allowed=False,
-                    requires_approval=True,
-                    reason_code="SRE_REQUIRES_HUMAN_REVIEW",
-                )
-            elif validated_sre.action == "canary":
-                policy = ActionDecision(
-                    allowed=False,
-                    requires_approval=True,
-                    reason_code="SRE_CANARY_REQUIRES_DEDICATED_EXECUTOR",
-                )
 
         execution_allowed = (
             selected_path == "execute"
