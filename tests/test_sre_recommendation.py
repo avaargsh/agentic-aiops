@@ -60,6 +60,8 @@ def test_valid_recommendation_is_typed_and_never_authorizes_execution():
         ({"evidence_ids": ["diff:change-123", "diff:change-123"]}, "unique"),
         ({"expected_losses": {"canary": math.nan}}, "finite non-negative"),
         ({"expected_losses": {"canary": -1}}, "finite non-negative"),
+        ({"expected_losses": {"canary": 10**1000}}, "finite non-negative"),
+        ({"risk_context_multiplier": 10**1000}, "risk_context_multiplier"),
         (
             {"expected_losses": {"canary": 2.0}, "excluded_actions": {}},
             "every action must have an expected loss or an exclusion reason",
