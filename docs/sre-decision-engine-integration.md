@@ -2,7 +2,11 @@
 
 ## Status
 
-This document defines the integration boundary between agent-decision-lab's SRE expected-loss recommendation contract and agentic-aiops' evidence/authorization workflow. A strict `validate_sre_recommendation()` helper now validates schema version, current change identity, evidence-bundle membership, typed losses and `authorized=false`. The helper is tested but is **not yet wired into ActionOrchestrator or a dedicated HTTP endpoint**; this PR establishes the contract gate without changing execution behavior.
+This document defines the integration boundary between agent-decision-lab's SRE expected-loss recommendation contract and agentic-aiops' evidence/authorization workflow.
+
+The optional `sre_recommendation` argument to `ActionOrchestrator.decide()` now invokes `validate_sre_recommendation()`. The validator checks schema version, the caller-supplied active change ID, evidence membership in the proposal's current evidence IDs, typed expected losses and the invariant `authorized=false`. The recommendation is applied as a **veto-only overlay**: rejection short-circuits execution, human review stays non-executable, canary is routed to human review because no dedicated canary executor exists, and allow never upgrades a generic model fallback.
+
+This is a tested library boundary, not yet an authenticated service boundary. There is no dedicated HTTP endpoint, signed recommendation provenance, freshness/assessment digest, mandatory enforcement for every write, or live control-plane integration. Until these are implemented, the caller must be trusted to supply the intended recommendation; this optional payload must not be treated as proof that a specific risk assessment was issued by a trusted service.
 
 ## Ownership
 
@@ -28,17 +32,17 @@ Error-budget and incident context must be captured at the decision timestamp, wi
 
 ## Recommendation consumption
 
-When runtime integration is implemented, validate the versioned response before it influences orchestration:
+Current library behavior:
 
-1. Require schema_version = sre-decision/v1 and authorized = false.
-2. Bind change_id to the current proposal/run; reject cross-change or stale decisions.
-3. Require every referenced evidence ID to exist in the frozen EvidenceBundle and retain the evidence digest.
-4. Preserve model_id, calibration_id, policy_version, reason_code, expected_losses and excluded_actions in the Decision Ledger.
-5. Treat allow/canary as recommendations only. Existing deterministic ActionPolicy, approval requirements, runtime authority and live-effect boundaries remain mandatory.
-6. A hard constraint violation remains a denial/rejection path; no model score can override it.
-7. After apply, evaluate post-action SLO/health evidence. A successful executor exit code alone does not prove recovery.
+1. Require exact `sre-decision/v1` fields and `authorized = false`.
+2. Require the caller to provide the expected `change_id`; reject a mismatch.
+3. Require non-empty recommendation evidence IDs, all of which must exist in the current proposal evidence IDs.
+4. Retain the complete normalized recommendation plus its SHA-256 in the Decision Ledger.
+5. An SRE `reject` never selects execution. `human_review` is non-executable. `canary` is downgraded to human review until a canary-specific executor is available. `allow` does not override a generic model fallback.
+6. Existing deterministic ActionPolicy, approval requirements, runtime authority and live-effect boundaries remain in force.
+7. Post-action verification and rollback remain the execution runner's responsibility.
 
-Do not overload the current generic /decision candidate-choice API with a second incompatible response contract. Use a dedicated typed adapter or versioned endpoint and fail closed on schema or provenance mismatch.
+Remaining gaps: no freshness/assessment digest or cryptographic authenticity check exists yet, and the recommendation is an optional caller-supplied input rather than a mandatory SRE service result. Do not use this optional path as a production enforcement boundary until recommendation provenance and run/evidence freshness are authenticated. Do not overload the current generic `/decision` candidate-choice API; a future remote SRE service should use a dedicated typed adapter or versioned endpoint.
 
 ## Evaluation protocol
 
