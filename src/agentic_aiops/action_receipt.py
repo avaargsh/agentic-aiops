@@ -19,6 +19,14 @@ def action_key(*, runtime_run_id: str, action: OrchestratedAction) -> str:
         "authority_digest": action.ledger.attributes.get("authority_digest", ""),
         "approval_id": action.ledger.attributes.get("approval_id", ""),
     }
+    # Preserve historical keys for legacy actions with no SRE/change identity,
+    # but isolate new receipts by trusted change and advisory assessment digest.
+    if action.proposal.change_id:
+        payload["change_id"] = action.proposal.change_id
+    recommendation_digest = action.ledger.attributes.get("sre_recommendation_sha256")
+    if recommendation_digest:
+        payload["sre_recommendation_sha256"] = recommendation_digest
+
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
