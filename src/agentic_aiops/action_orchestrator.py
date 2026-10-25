@@ -20,6 +20,8 @@ class ProposedAction:
     rollback_available: bool
     evidence_ids: tuple[str, ...] = ()
     description: str | None = None
+    # Identity is supplied by the trusted proposal/run builder, not the model.
+    change_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -77,13 +79,23 @@ class ActionOrchestrator:
         change_id: str | None = None,
         sre_recommendation: Mapping[str, object] | None = None,
     ) -> OrchestratedAction:
+        active_change_id = proposal.change_id
+        if change_id is not None:
+            if not isinstance(change_id, str) or not change_id.strip():
+                raise ValueError("change_id must be a non-empty string")
+            if active_change_id is not None and active_change_id != change_id:
+                raise ValueError("change_id does not match proposal.change_id")
+            active_change_id = change_id
+
         validated_sre: SREDecisionRecommendation | None = None
         if sre_recommendation is not None:
-            if not isinstance(change_id, str) or not change_id.strip():
-                raise ValueError("change_id is required when an SRE recommendation is supplied")
+            if not isinstance(proposal.change_id, str) or not proposal.change_id.strip():
+                raise ValueError("proposal.change_id is required when an SRE recommendation is supplied")
+            if active_change_id != proposal.change_id:
+                raise ValueError("change_id does not match proposal.change_id")
             validated_sre = validate_sre_recommendation(
                 sre_recommendation,
-                expected_change_id=change_id,
+                expected_change_id=proposal.change_id,
                 available_evidence_ids=proposal.evidence_ids,
             )
 
@@ -106,8 +118,8 @@ class ActionOrchestrator:
                 "evidence_count": len(proposal.evidence_ids),
                 "evidence_digest": evidence_digest,
             }
-            if change_id is not None:
-                context["change_id"] = change_id
+            if active_change_id is not None:
+                context["change_id"] = active_change_id
 
             response = self.decision_client.decide(
                 decision_type="escalation",
@@ -186,7 +198,7 @@ class ActionOrchestrator:
             "approval_ref": approval_ref or "",
             "evidence_digest": evidence_digest or "",
             "decision_id": decision_id or "",
-            "change_id": change_id or "",
+            "change_id": active_change_id or "",
         }
         if validated_sre is not None:
             serialized_sre = json.dumps(
