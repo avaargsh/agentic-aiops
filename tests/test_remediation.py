@@ -145,3 +145,73 @@ def test_fallback_path_never_executes() -> None:
 
     assert result.status == "NOT_SELECTED_FOR_EXECUTION"
     assert executor.executed == 0
+
+
+def sre_recommendation(action):
+    losses = {
+        "allow": 10.0,
+        "canary": 2.0,
+        "human_review": 3.0,
+        "reject": 15.0,
+    }
+    return {
+        "schema_version": "sre-decision/v1",
+        "change_id": "change-1",
+        "action": action,
+        "reason_code": "MINIMUM_EXPECTED_LOSS_UNDER_CONSTRAINTS",
+        "expected_losses": {} if action == "human_review" else {action: losses[action]},
+        "excluded_actions": (
+            {name: "HUMAN_REVIEW" for name in ("allow", "canary", "reject")}
+            if action == "human_review"
+            else {name: "NOT_SELECTED" for name in losses if name != action}
+        ),
+        "risk_context_multiplier": 1.2,
+        "evidence_ids": ["e-before"],
+        "model_id": "risk@sha256:abc",
+        "calibration_id": "cal@sha256:def",
+        "policy_version": "sre-v1",
+        "authorized": False,
+    }
+
+
+def test_sre_canary_cannot_execute_as_full_remediation_even_if_approval_flag_is_true():
+    orchestrated = ActionOrchestrator(
+        decision_client=DecisionClient(),
+    ).decide(
+        write_action(),
+        change_id="change-1",
+        sre_recommendation=sre_recommendation("canary"),
+    )
+    executor = Executor()
+    result = SafeRemediationRunner(
+        executor=executor,
+        verifier=Verifier(True),
+    ).run(
+        orchestrated,
+        approval_granted=True,
+    )
+    assert orchestrated.policy.reason_code == "SRE_CANARY_REQUIRES_DEDICATED_EXECUTOR"
+    assert result.status == "NOT_SELECTED_FOR_EXECUTION"
+    assert executor.executed == 0
+    assert executor.rolled_back == 0
+
+
+def test_sre_reject_never_executes_remediation():
+    orchestrated = ActionOrchestrator(
+        decision_client=DecisionClient(),
+    ).decide(
+        write_action(),
+        change_id="change-1",
+        sre_recommendation=sre_recommendation("reject"),
+    )
+    executor = Executor()
+    result = SafeRemediationRunner(
+        executor=executor,
+        verifier=Verifier(True),
+    ).run(
+        orchestrated,
+        approval_granted=True,
+    )
+    assert orchestrated.policy.reason_code == "SRE_REJECT_RECOMMENDATION"
+    assert result.status == "NOT_SELECTED_FOR_EXECUTION"
+    assert executor.executed == 0
