@@ -49,7 +49,8 @@
 
 
 ## v0.5 — SRE Decision Engine Integration
-- [x] strict sre-decision/v1 recommendation validator for schema, change identity, evidence membership and non-authorization
+- [x] strict sre-decision/v1 recommendation validator for schema, change identity, complete action coverage, evidence membership and non-authorization
+- [x] bind recommendation identity to trusted ProposedAction.change_id and reject conflicting external IDs
 - [x] optional veto-only integration into ActionOrchestrator; allow cannot upgrade a generic fallback
 - [x] SRE reject and human-review paths cannot execute; canary is held for a dedicated executor
 - [x] persist recommendation JSON and SHA-256 plus risk/policy reason in the Decision Ledger
