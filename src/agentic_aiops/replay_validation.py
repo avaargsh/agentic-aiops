@@ -26,6 +26,19 @@ def validate_frozen_identity(
     frozen_authority = bundle.metadata.get("authority_digest")
     ledger_attrs = dict(action.ledger.attributes)
 
+    proposal_change_id = action.proposal.change_id
+    ledger_change_id = ledger_attrs.get("change_id")
+    if proposal_change_id is not None or ledger_change_id:
+        if (
+            not isinstance(proposal_change_id, str)
+            or not proposal_change_id.strip()
+            or ledger_change_id != proposal_change_id
+        ):
+            raise ReplayValidationError(
+                ReplayErrorCode.CHANGE_MISMATCH,
+                "proposal change_id does not match decision ledger change_id",
+            )
+
     if context.release_ref and frozen_release != context.release_ref:
         raise ReplayValidationError(
             ReplayErrorCode.RELEASE_MISMATCH,

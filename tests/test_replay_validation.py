@@ -50,6 +50,7 @@ def fixture():
             "deployment/checkout-api",
             "single-workload",
             True,
+            change_id="change-123",
         ),
         selected_path="execute",
         model_confidence=0.99,
@@ -69,6 +70,7 @@ def fixture():
                 "authority_digest": AUTHORITY_DIGEST,
                 "evidence_digest": bundle_sha256,
                 "approval_id": APPROVAL_ID,
+                "change_id": "change-123",
             },
         ),
     )
@@ -122,6 +124,13 @@ def test_validate_frozen_identity_rejects_each_identity_drift(
         action = with_ledger(action, authority_digest="sha256:other")
     elif mutation == "ledger-evidence":
         action = with_ledger(action, evidence_digest="sha256:other")
+    elif mutation == "proposal-change":
+        action = replace(
+            action,
+            proposal=replace(action.proposal, change_id="change-other"),
+        )
+    elif mutation == "ledger-change":
+        action = with_ledger(action, change_id="change-other")
 
     with pytest.raises(ReplayValidationError, match=message) as exc:
         validate_frozen_identity(

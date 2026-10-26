@@ -46,3 +46,21 @@
 - [x] recovery success rate
 - [ ] evidence precision / coverage
 - [ ] MTTD / MTTR simulation
+
+
+## v0.5 — SRE Decision Engine Integration
+- [x] strict sre-decision/v1 recommendation validator for schema, change identity, complete action coverage, evidence membership and non-authorization
+- [x] bind recommendation identity to trusted ProposedAction.change_id and reject conflicting external IDs
+- [x] optional veto-only integration into ActionOrchestrator; allow cannot upgrade a generic fallback
+- [x] SRE reject and human-review paths cannot execute; canary is held for a dedicated executor
+- [x] persist recommendation JSON and SHA-256 plus risk/policy reason in the Decision Ledger
+- [x] preserve change_id through frozen-state recovery and reject proposal/ledger identity drift
+- [x] bind receipt idempotency keys to change_id and SRE recommendation digest without changing legacy key shape
+- [x] reject malformed, out-of-range, non-finite, and missing model confidence for selected candidates
+- [ ] dedicated authenticated client/endpoint for trusted SRE recommendations
+- [ ] bind decision freshness/assessment digest and durable Run identity; add signature/authentication provenance
+- [ ] make required SRE review policy explicit for protected/high-risk change classes
+- [ ] propagate timestamped SLO/error-budget and active-incident context from an authoritative source
+- [ ] live cross-repo/control-plane acceptance proving no authorization bypass
+- [ ] replay time-split change/incident cases and compare expected loss with rules-only baseline
+- [ ] run shadow mode before enabling any bounded automated action

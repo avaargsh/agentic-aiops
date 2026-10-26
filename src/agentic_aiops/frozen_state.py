@@ -46,6 +46,7 @@ def load_frozen_state(
         rollback_available=proposal_data["rollback_available"],
         evidence_ids=tuple(proposal_data.get("evidence_ids", ())),
         description=proposal_data.get("description"),
+        change_id=proposal_data.get("change_id"),
     )
     policy = ActionDecision(**data["policy"])
     ledger_data = data["ledger"]
